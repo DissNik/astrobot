@@ -39,8 +39,7 @@ class UserRepository:
                 language = excluded.language,
                 forecast_days = excluded.forecast_days,
                 observing_profile = excluded.observing_profile,
-                score_threshold = excluded.score_threshold,
-                created_at = excluded.created_at
+                score_threshold = excluded.score_threshold
             """,
             (
                 user.telegram_id,
@@ -52,7 +51,6 @@ class UserRepository:
                 user.created_at.isoformat(),
             ),
         )
-        self.connection.commit()
 
     def get(self, telegram_id: int) -> User | None:
         row = self.connection.execute(

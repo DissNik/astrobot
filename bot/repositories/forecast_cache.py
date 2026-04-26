@@ -38,7 +38,6 @@ class ForecastCacheRepository:
                 created_at.isoformat(),
             ),
         )
-        self.connection.commit()
 
     def get(self, location_id: int, provider: str, forecast_date: str) -> dict[str, Any] | None:
         row = self.connection.execute(

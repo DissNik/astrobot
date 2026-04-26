@@ -53,7 +53,6 @@ class LocationRepository:
                 location.created_at.isoformat(),
             ),
         )
-        self.connection.commit()
         return replace(location, id=cursor.lastrowid)
 
     def list_for_user(self, user_id: int) -> list[Location]:
@@ -68,8 +67,6 @@ class LocationRepository:
             "UPDATE locations SET enabled_for_subscription = ? WHERE id = ?",
             (int(enabled), location_id),
         )
-        self.connection.commit()
 
     def delete(self, location_id: int) -> None:
         self.connection.execute("DELETE FROM locations WHERE id = ?", (location_id,))
-        self.connection.commit()

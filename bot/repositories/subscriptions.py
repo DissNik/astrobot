@@ -56,7 +56,6 @@ class SubscriptionRepository:
                 subscription.updated_at.isoformat(),
             ),
         )
-        self.connection.commit()
 
     def get(self, user_id: int) -> Subscription | None:
         row = self.connection.execute(
