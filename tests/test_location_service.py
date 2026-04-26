@@ -26,6 +26,66 @@ def test_build_location_from_coordinates_validates_bortle() -> None:
     assert location.bortle_class == 4
 
 
+def test_build_location_from_coordinates_normalizes_name_and_sky_preset() -> None:
+    created_at = datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC"))
+
+    location = build_location_from_coordinates(
+        user_id=100,
+        name="  Поле  ",
+        latitude=45.0,
+        longitude=39.0,
+        sky_preset="dark_site",
+        bortle_class=None,
+        enabled_for_subscription=True,
+        created_at=created_at,
+    )
+
+    assert location.name == "Поле"
+    assert location.sky_preset is SkyPreset.DARK_SITE
+
+
+def test_build_location_from_coordinates_rejects_empty_name() -> None:
+    with pytest.raises(ValueError, match="name must not be empty"):
+        build_location_from_coordinates(
+            user_id=100,
+            name=" ",
+            latitude=45.0,
+            longitude=39.0,
+            sky_preset=SkyPreset.DARK_SITE,
+            bortle_class=None,
+            enabled_for_subscription=True,
+            created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+        )
+
+
+def test_build_location_from_coordinates_rejects_invalid_sky_preset() -> None:
+    with pytest.raises(ValueError, match="sky_preset must be a valid SkyPreset"):
+        build_location_from_coordinates(
+            user_id=100,
+            name="Поле",
+            latitude=45.0,
+            longitude=39.0,
+            sky_preset="invalid",
+            bortle_class=None,
+            enabled_for_subscription=True,
+            created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+        )
+
+
+def test_build_location_from_coordinates_requires_custom_bortle_class_for_raw_value() -> None:
+    with pytest.raises(ValueError, match="custom bortle sky preset requires bortle_class"):
+        build_location_from_coordinates(
+            user_id=100,
+            name="Поле",
+            latitude=45.0,
+            longitude=39.0,
+            sky_preset="custom_bortle",
+            bortle_class=None,
+            enabled_for_subscription=True,
+            created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+        )
+
+
 @pytest.mark.parametrize("latitude", [-90.1, 90.1])
 def test_build_location_from_coordinates_rejects_invalid_latitude(latitude: float) -> None:
     with pytest.raises(ValueError, match="latitude must be between -90 and 90"):

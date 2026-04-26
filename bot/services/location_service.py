@@ -9,11 +9,16 @@ def build_location_from_coordinates(
     name: str,
     latitude: float,
     longitude: float,
-    sky_preset: SkyPreset,
+    sky_preset: SkyPreset | str,
     bortle_class: int | None,
     enabled_for_subscription: bool,
     created_at: datetime,
 ) -> Location:
+    name = name.strip()
+    if not name:
+        raise ValueError("name must not be empty")
+    sky_preset = _normalize_sky_preset(sky_preset)
+
     if not -90 <= latitude <= 90:
         raise ValueError("latitude must be between -90 and 90")
     if not -180 <= longitude <= 180:
@@ -35,3 +40,10 @@ def build_location_from_coordinates(
         enabled_for_subscription=enabled_for_subscription,
         created_at=created_at,
     )
+
+
+def _normalize_sky_preset(sky_preset: SkyPreset | str) -> SkyPreset:
+    try:
+        return SkyPreset(sky_preset)
+    except ValueError as error:
+        raise ValueError("sky_preset must be a valid SkyPreset") from error

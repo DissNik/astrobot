@@ -1,6 +1,8 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
+import pytest
+
 from bot.domain.enums import LocationSource, SkyPreset, SubscriptionMode
 from bot.domain.models import Location, LocationForecast, NightForecast
 from bot.services.subscription_service import select_reports_for_subscription
@@ -80,4 +82,33 @@ def test_good_conditions_only_keeps_reports_with_any_night_at_or_above_threshold
         threshold=65,
     )
 
-    assert selected == [first, second]
+    assert [report.location.name for report in selected] == ["First", "Second"]
+    assert [night.score for night in selected[0].nights] == [70]
+    assert [night.score for night in selected[1].nights] == [65]
+
+
+def test_select_reports_for_subscription_normalizes_raw_mode() -> None:
+    low = _report("Low", [10])
+
+    selected = select_reports_for_subscription(
+        reports=[low],
+        mode="daily_digest",
+        threshold=60,
+    )
+
+    assert selected == [low]
+
+
+def test_select_reports_for_subscription_rejects_invalid_mode() -> None:
+    with pytest.raises(ValueError, match="mode must be a valid SubscriptionMode"):
+        select_reports_for_subscription(reports=[], mode="invalid", threshold=60)
+
+
+@pytest.mark.parametrize("threshold", [-1, 101])
+def test_select_reports_for_subscription_rejects_invalid_threshold(threshold: int) -> None:
+    with pytest.raises(ValueError, match="threshold must be between 0 and 100"):
+        select_reports_for_subscription(
+            reports=[],
+            mode=SubscriptionMode.DAILY_DIGEST,
+            threshold=threshold,
+        )
