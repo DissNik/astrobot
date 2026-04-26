@@ -1,0 +1,1 @@
+"""Localized text templates."""

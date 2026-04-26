@@ -1,0 +1,1 @@
+FORECAST_TITLE = "Астропрогноз"
