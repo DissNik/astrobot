@@ -13,6 +13,11 @@ def build_location_forecast(
     provider_forecast: ProviderForecast,
     profile: ObservingProfile,
 ) -> LocationForecast:
+    """Build nightly forecasts.
+
+    Provider data must include one extra daily astronomy record because each
+    night uses the current sunset and the next day's sunrise.
+    """
     daily_by_date = {day.day: day for day in provider_forecast.daily}
     nights: list[NightForecast] = []
 
@@ -31,7 +36,7 @@ def build_location_forecast(
         high_cloud_cover = _rounded_average(sample.cloud_cover_high for sample in hourly)
         humidity = _rounded_average(sample.humidity for sample in hourly)
         wind_speed = round(mean(sample.wind_speed for sample in hourly), 1)
-        moon_visible = _moon_visible(astronomy, window_start, window_end)
+        moon_visible = _moon_visible(astronomy, next_astronomy, window_start, window_end)
 
         score = score_conditions(
             ScoreInput(
@@ -65,6 +70,12 @@ def build_location_forecast(
     return LocationForecast(location=location, nights=tuple(nights))
 
 
+def provider_days_for_nights(nights: int) -> int:
+    if nights < 1:
+        raise ValueError("nights must be greater than or equal to 1")
+    return nights + 1
+
+
 def _hourly_in_window(
     hourly: tuple[HourlyWeather, ...],
     window_start: datetime,
@@ -77,15 +88,31 @@ def _rounded_average(values: Iterable[int]) -> int:
     return round(mean(values))
 
 
-def _moon_visible(astronomy: DailyAstronomy, window_start: datetime, window_end: datetime) -> bool:
-    moonrise = astronomy.moonrise
-    moonset = astronomy.moonset
+def _moon_visible(
+    astronomy: DailyAstronomy,
+    next_astronomy: DailyAstronomy,
+    window_start: datetime,
+    window_end: datetime,
+) -> bool:
+    for moon_event in (
+        astronomy.moonrise,
+        astronomy.moonset,
+        next_astronomy.moonrise,
+        next_astronomy.moonset,
+    ):
+        if moon_event is not None and window_start <= moon_event <= window_end:
+            return True
 
-    if moonrise is not None and window_start <= moonrise <= window_end:
-        return True
-    if moonset is not None and window_start <= moonset <= window_end:
-        return True
-    if moonrise is not None and moonset is not None:
-        return moonrise <= window_end and moonset >= window_start
+    for moonrise, moonset in (
+        (astronomy.moonrise, astronomy.moonset),
+        (next_astronomy.moonrise, next_astronomy.moonset),
+    ):
+        if (
+            moonrise is not None
+            and moonset is not None
+            and moonrise <= window_end
+            and moonset >= window_start
+        ):
+            return True
 
     return False

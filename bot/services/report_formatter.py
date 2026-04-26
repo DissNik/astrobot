@@ -4,8 +4,12 @@ from bot.texts.ru import FORECAST_TITLE
 
 def format_forecast_report(reports: list[LocationForecast]) -> str:
     lines = [FORECAST_TITLE]
+    reports_with_nights = [report for report in reports if report.nights]
 
-    for report in reports:
+    if not reports_with_nights:
+        return f"{FORECAST_TITLE}\nНет доступных прогнозов."
+
+    for report in reports_with_nights:
         lines.append("")
         lines.append(report.location.name)
 

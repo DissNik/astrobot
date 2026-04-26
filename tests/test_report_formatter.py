@@ -43,3 +43,30 @@ def test_format_forecast_report_includes_compact_russian_night_summary() -> None
     assert "78/100" in text
     assert "можно ехать" in text
     assert "Облачность: 15%" in text
+
+
+def test_format_forecast_report_handles_empty_reports() -> None:
+    text = format_forecast_report([])
+
+    assert "Астропрогноз" in text
+    assert "Нет доступных прогнозов." in text
+
+
+def test_format_forecast_report_skips_locations_without_nights() -> None:
+    location = Location(
+        id=1,
+        user_id=10,
+        name="Empty field",
+        latitude=44.6,
+        longitude=39.7,
+        source=LocationSource.COORDINATES,
+        sky_preset=SkyPreset.DARK_SITE,
+        bortle_class=3,
+        enabled_for_subscription=True,
+        created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+
+    text = format_forecast_report([LocationForecast(location=location, nights=[])])
+
+    assert "Нет доступных прогнозов." in text
+    assert "Empty field" not in text
