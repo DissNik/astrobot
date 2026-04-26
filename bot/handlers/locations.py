@@ -19,3 +19,8 @@ async def locations_callback(callback: CallbackQuery) -> None:
     if callback.message:
         await callback.message.answer(LOCATIONS_TEXT, reply_markup=locations_keyboard())
     await callback.answer()
+
+
+@router.callback_query(F.data.in_({"locations:add", "locations:list"}))
+async def locations_placeholder_callback(callback: CallbackQuery) -> None:
+    await callback.answer("Управление точками будет доступно в следующем шаге.", show_alert=True)
