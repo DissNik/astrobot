@@ -10,13 +10,19 @@ python3 -m venv .venv
 cp .env.example .env
 ```
 
-Edit `.env` before running the completed application workflow. This Task 1 scaffold does not
-include the migration script or bot entrypoint yet; they are part of the intended app workflow:
+Edit `.env`, then run migrations:
 
 ```bash
 .venv/bin/python scripts/run_migrations.py
+```
+
+Run the bot:
+
+```bash
 .venv/bin/python -m bot.main
 ```
+
+The MVP uses Telegram polling, so no public domain or HTTPS endpoint is required.
 
 Run tests:
 
