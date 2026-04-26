@@ -1,7 +1,7 @@
 import pytest
 
 from bot.domain.enums import ObservingProfile, SkyPreset
-from bot.services.scoring_service import ScoreInput, _verdict, score_conditions
+from bot.services.scoring_service import ScoreInput, ScoreResult, _verdict, score_conditions
 
 
 def _valid_score_input(**overrides: object) -> ScoreInput:
@@ -107,6 +107,32 @@ def test_score_result_reasons_are_immutable_tuple() -> None:
     assert isinstance(result.reasons, tuple)
 
 
+def test_score_result_normalizes_direct_reasons_to_tuple() -> None:
+    result = ScoreResult(score=80, verdict="отлично", reasons=["мало облаков"])
+
+    assert result.reasons == ("мало облаков",)
+    assert isinstance(result.reasons, tuple)
+
+
+def test_score_input_normalizes_raw_enum_strings() -> None:
+    data = _valid_score_input(profile="deep_sky", sky_preset="dark_site")
+
+    assert data.profile is ObservingProfile.DEEP_SKY
+    assert data.sky_preset is SkyPreset.DARK_SITE
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("profile", "invalid", "profile must be a valid ObservingProfile"),
+        ("sky_preset", "invalid", "sky_preset must be a valid SkyPreset"),
+    ],
+)
+def test_score_input_rejects_invalid_enum_strings(field: str, value: str, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        _valid_score_input(**{field: value})
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
@@ -136,6 +162,25 @@ def test_score_input_allows_missing_bortle_class() -> None:
     data = _valid_score_input(bortle_class=None)
 
     assert data.bortle_class is None
+
+
+def test_score_conditions_clamps_score_to_zero() -> None:
+    result = score_conditions(
+        _valid_score_input(
+            cloud_cover=100,
+            high_cloud_cover=100,
+            moon_phase=1,
+            moon_visible=True,
+            humidity=100,
+            fog_risk=100,
+            wind_speed=10,
+            sky_preset=SkyPreset.CITY,
+            bortle_class=9,
+        )
+    )
+
+    assert result.score == 0
+    assert result.verdict == "не стоит"
 
 
 @pytest.mark.parametrize(

@@ -57,6 +57,16 @@ class ScoreInput:
     bortle_class: int | None
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "profile",
+            _normalize_enum("profile", self.profile, ObservingProfile),
+        )
+        object.__setattr__(
+            self,
+            "sky_preset",
+            _normalize_enum("sky_preset", self.sky_preset, SkyPreset),
+        )
         _validate_range("cloud_cover", self.cloud_cover, PERCENT_MIN, PERCENT_MAX)
         _validate_range("high_cloud_cover", self.high_cloud_cover, PERCENT_MIN, PERCENT_MAX)
         _validate_range("humidity", self.humidity, PERCENT_MIN, PERCENT_MAX)
@@ -73,6 +83,9 @@ class ScoreResult:
     score: int
     verdict: str
     reasons: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "reasons", tuple(self.reasons))
 
 
 def score_conditions(data: ScoreInput) -> ScoreResult:
@@ -135,6 +148,17 @@ def score_conditions(data: ScoreInput) -> ScoreResult:
 def _validate_range(name: str, value: int | float, minimum: int, maximum: int) -> None:
     if not minimum <= value <= maximum:
         raise ValueError(f"{name} must be between {minimum} and {maximum}")
+
+
+def _normalize_enum(
+    name: str,
+    value: ObservingProfile | SkyPreset | str,
+    enum_type: type[ObservingProfile] | type[SkyPreset],
+) -> ObservingProfile | SkyPreset:
+    try:
+        return enum_type(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a valid {enum_type.__name__}") from exc
 
 
 def _preset_bortle(preset: SkyPreset) -> int:
