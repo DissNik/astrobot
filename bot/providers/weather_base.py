@@ -35,5 +35,9 @@ class DailyAstronomy:
 @dataclass(frozen=True)
 class ProviderForecast:
     timezone: str
-    hourly: list[HourlyWeather]
-    daily: list[DailyAstronomy]
+    hourly: tuple[HourlyWeather, ...]
+    daily: tuple[DailyAstronomy, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "hourly", tuple(self.hourly))
+        object.__setattr__(self, "daily", tuple(self.daily))
