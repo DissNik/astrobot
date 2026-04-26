@@ -10,15 +10,11 @@ python3 -m venv .venv
 cp .env.example .env
 ```
 
-Edit `.env`, then run migrations:
+Edit `.env` before running the completed application workflow. This Task 1 scaffold does not
+include the migration script or bot entrypoint yet; they are part of the intended app workflow:
 
 ```bash
 .venv/bin/python scripts/run_migrations.py
-```
-
-Run the bot:
-
-```bash
 .venv/bin/python -m bot.main
 ```
 

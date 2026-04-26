@@ -19,14 +19,15 @@ class Settings(BaseSettings):
     @field_validator("telegram_bot_token")
     @classmethod
     def token_must_not_be_empty(cls, value: str) -> str:
-        if not value.strip():
+        normalized = value.strip()
+        if not normalized:
             raise ValueError("TELEGRAM_BOT_TOKEN must not be empty")
-        return value
+        return normalized
 
     @field_validator("log_level")
     @classmethod
     def normalize_log_level(cls, value: str) -> str:
-        normalized = value.upper()
+        normalized = value.strip().upper()
         allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if normalized not in allowed:
             raise ValueError(f"LOG_LEVEL must be one of: {', '.join(sorted(allowed))}")
