@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date, datetime, time
 
-from bot.domain.enums import ObservingProfile, SkyPreset, SubscriptionMode
+from bot.domain.enums import LocationSource, ObservingProfile, SkyPreset, SubscriptionMode
 
 
 @dataclass(frozen=True)
@@ -22,7 +22,7 @@ class Location:
     name: str
     latitude: float
     longitude: float
-    source: str
+    source: LocationSource
     sky_preset: SkyPreset
     bortle_class: int | None
     enabled_for_subscription: bool
@@ -64,10 +64,16 @@ class NightForecast:
     moon_visible: bool
     humidity: int
     wind_speed: float
-    reasons: list[str]
+    reasons: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "reasons", tuple(self.reasons))
 
 
 @dataclass(frozen=True)
 class LocationForecast:
     location: Location
-    nights: list[NightForecast]
+    nights: tuple[NightForecast, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "nights", tuple(self.nights))

@@ -1,8 +1,11 @@
 from datetime import date, datetime, time
+from typing import get_type_hints
 from zoneinfo import ZoneInfo
 
-from bot.domain.enums import ObservingProfile, SkyPreset, SubscriptionMode
-from bot.domain.models import Location, NightForecast, Subscription
+import pytest
+
+from bot.domain.enums import LocationSource, ObservingProfile, SkyPreset, SubscriptionMode
+from bot.domain.models import Location, LocationForecast, NightForecast, Subscription
 
 
 def test_location_uses_custom_bortle_when_present() -> None:
@@ -12,7 +15,7 @@ def test_location_uses_custom_bortle_when_present() -> None:
         name="Dark field",
         latitude=44.6,
         longitude=39.7,
-        source="coordinates",
+        source=LocationSource.COORDINATES,
         sky_preset=SkyPreset.CUSTOM_BORTLE,
         bortle_class=3,
         enabled_for_subscription=True,
@@ -29,7 +32,7 @@ def test_location_maps_sky_preset_to_bortle_estimate() -> None:
         name="Suburb",
         latitude=44.6,
         longitude=39.7,
-        source="city",
+        source=LocationSource.CITY,
         sky_preset=SkyPreset.SUBURB,
         bortle_class=None,
         enabled_for_subscription=False,
@@ -39,7 +42,25 @@ def test_location_maps_sky_preset_to_bortle_estimate() -> None:
     assert location.effective_bortle == 6
 
 
-def test_subscription_defaults_match_spec() -> None:
+def test_location_source_is_typed_as_location_source() -> None:
+    location = Location(
+        id=1,
+        user_id=10,
+        name="Suburb",
+        latitude=44.6,
+        longitude=39.7,
+        source=LocationSource.CITY,
+        sky_preset=SkyPreset.SUBURB,
+        bortle_class=None,
+        enabled_for_subscription=False,
+        created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert get_type_hints(Location)["source"] is LocationSource
+    assert location.source is LocationSource.CITY
+
+
+def test_subscription_keeps_configured_values() -> None:
     subscription = Subscription(
         user_id=10,
         enabled=False,
@@ -55,7 +76,7 @@ def test_subscription_defaults_match_spec() -> None:
     assert subscription.score_threshold == 60
 
 
-def test_night_forecast_best_score_property() -> None:
+def test_night_forecast_normalizes_reasons_to_tuple() -> None:
     forecast = NightForecast(
         night=date(2026, 4, 26),
         score=78,
@@ -70,3 +91,39 @@ def test_night_forecast_best_score_property() -> None:
     )
 
     assert forecast.score == 78
+    assert forecast.reasons == ("мало облаков",)
+    with pytest.raises(AttributeError):
+        forecast.reasons.append("нет ветра")
+
+
+def test_location_forecast_normalizes_nights_to_tuple() -> None:
+    location = Location(
+        id=1,
+        user_id=10,
+        name="Dark field",
+        latitude=44.6,
+        longitude=39.7,
+        source=LocationSource.COORDINATES,
+        sky_preset=SkyPreset.CUSTOM_BORTLE,
+        bortle_class=3,
+        enabled_for_subscription=True,
+        created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+    night = NightForecast(
+        night=date(2026, 4, 26),
+        score=78,
+        verdict="можно ехать",
+        cloud_cover=18,
+        high_cloud_cover=10,
+        moon_phase=0.24,
+        moon_visible=True,
+        humidity=70,
+        wind_speed=4.2,
+        reasons=["мало облаков"],
+    )
+
+    forecast = LocationForecast(location=location, nights=[night])
+
+    assert forecast.nights == (night,)
+    with pytest.raises(AttributeError):
+        forecast.nights.append(night)
