@@ -81,11 +81,11 @@ def _moon_visible(astronomy: DailyAstronomy, window_start: datetime, window_end:
     moonrise = astronomy.moonrise
     moonset = astronomy.moonset
 
+    if moonrise is not None and window_start <= moonrise <= window_end:
+        return True
     if moonset is not None and window_start <= moonset <= window_end:
         return True
     if moonrise is not None and moonset is not None:
         return moonrise <= window_end and moonset >= window_start
-    if moonrise is not None:
-        return window_start <= moonrise <= window_end
 
     return False

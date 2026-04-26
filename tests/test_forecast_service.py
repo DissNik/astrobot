@@ -86,3 +86,54 @@ def test_build_location_forecast_aggregates_hourly_weather_in_useful_night_windo
     assert len(result.nights) == 1
     assert result.nights[0].night == date(2026, 4, 26)
     assert result.nights[0].cloud_cover == 15
+
+
+def test_build_location_forecast_marks_moon_visible_when_moonrise_is_inside_window() -> None:
+    location = Location(
+        id=1,
+        user_id=10,
+        name="Dark field",
+        latitude=44.6,
+        longitude=39.7,
+        source=LocationSource.COORDINATES,
+        sky_preset=SkyPreset.DARK_SITE,
+        bortle_class=3,
+        enabled_for_subscription=True,
+        created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+    provider_forecast = ProviderForecast(
+        timezone="Europe/Moscow",
+        hourly=[
+            HourlyWeather(
+                time=datetime(2026, 4, 26, 23, 30),
+                cloud_cover=10,
+                cloud_cover_low=0,
+                cloud_cover_mid=5,
+                cloud_cover_high=5,
+                humidity=60,
+                wind_speed=3.0,
+            ),
+        ],
+        daily=[
+            DailyAstronomy(
+                day=date(2026, 4, 26),
+                sunrise=datetime(2026, 4, 26, 5, 30),
+                sunset=datetime(2026, 4, 26, 19, 0),
+                moonrise=datetime(2026, 4, 26, 23, 0),
+                moonset=datetime(2026, 4, 26, 9, 0),
+                moon_phase=0.2,
+            ),
+            DailyAstronomy(
+                day=date(2026, 4, 27),
+                sunrise=datetime(2026, 4, 27, 6, 0),
+                sunset=datetime(2026, 4, 27, 19, 2),
+                moonrise=None,
+                moonset=None,
+                moon_phase=0.25,
+            ),
+        ],
+    )
+
+    result = build_location_forecast(location, provider_forecast, ObservingProfile.DEEP_SKY)
+
+    assert result.nights[0].moon_visible is True
