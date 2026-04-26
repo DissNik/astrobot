@@ -30,6 +30,10 @@ Run tests:
 .venv/bin/pytest
 ```
 
+## Manual Verification
+
+Use `docs/manual-test-checklist.md` before deploying to a long-running VPS service.
+
 ## systemd
 
 ```ini
