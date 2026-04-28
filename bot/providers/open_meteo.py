@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 import httpx
 
@@ -12,7 +12,9 @@ HOURLY_FIELDS = (
     "relative_humidity_2m",
     "wind_speed_10m",
 )
-DAILY_FIELDS = ("sunrise", "sunset", "moonrise", "moonset", "moon_phase")
+DAILY_FIELDS = ("sunrise", "sunset")
+SYNODIC_MONTH_DAYS = 29.53058867
+KNOWN_NEW_MOON = date(2000, 1, 6)
 
 
 class OpenMeteoClient:
@@ -66,7 +68,7 @@ class OpenMeteoClient:
         sunset = _required_array(daily_payload, "sunset", daily_count, "daily")
         moonrise = _optional_array(daily_payload, "moonrise", daily_count, "daily")
         moonset = _optional_array(daily_payload, "moonset", daily_count, "daily")
-        moon_phase = _required_array(daily_payload, "moon_phase", daily_count, "daily")
+        moon_phase = _optional_array(daily_payload, "moon_phase", daily_count, "daily")
         daily = [
             DailyAstronomy(
                 day=datetime.fromisoformat(day).date(),
@@ -74,7 +76,7 @@ class OpenMeteoClient:
                 sunset=datetime.fromisoformat(sunset[index]),
                 moonrise=_parse_optional_datetime(moonrise[index]),
                 moonset=_parse_optional_datetime(moonset[index]),
-                moon_phase=float(moon_phase[index]),
+                moon_phase=_parse_moon_phase(moon_phase[index], datetime.fromisoformat(day).date()),
             )
             for index, day in enumerate(daily_time)
         ]
@@ -90,6 +92,17 @@ def _parse_optional_datetime(value: str | None) -> datetime | None:
     if value is None:
         return None
     return datetime.fromisoformat(value)
+
+
+def _parse_moon_phase(value: str | int | float | None, day: date) -> float:
+    if value is not None:
+        return float(value)
+    return _approximate_moon_phase(day)
+
+
+def _approximate_moon_phase(day: date) -> float:
+    days_since_known_new_moon = (day - KNOWN_NEW_MOON).days
+    return (days_since_known_new_moon % SYNODIC_MONTH_DAYS) / SYNODIC_MONTH_DAYS
 
 
 def _required_array(

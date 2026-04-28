@@ -25,9 +25,6 @@ def _open_meteo_payload() -> dict[str, object]:
             "time": ["2026-04-26"],
             "sunrise": ["2026-04-26T05:30"],
             "sunset": ["2026-04-26T19:10"],
-            "moonrise": ["2026-04-26T10:00"],
-            "moonset": ["2026-04-27T02:00"],
-            "moon_phase": [0.2],
         },
     }
 
@@ -135,19 +132,14 @@ async def test_forecast_request_includes_expected_params() -> None:
     assert params["forecast_days"] == "3"
     assert params["timezone"] == "auto"
     assert set(params["hourly"].split(",")) >= set(HOURLY_FIELDS)
-    assert set(params["daily"].split(",")) >= set(DAILY_FIELDS)
+    assert set(params["daily"].split(",")) == set(DAILY_FIELDS)
 
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_forecast_treats_missing_moon_arrays_as_none() -> None:
-    payload = _open_meteo_payload()
-    daily_payload = payload["daily"]
-    assert isinstance(daily_payload, dict)
-    daily_payload.pop("moonrise")
-    daily_payload.pop("moonset")
+async def test_forecast_computes_moon_phase_when_api_omits_lunar_fields() -> None:
     respx.get("https://api.open-meteo.com/v1/forecast").mock(
-        return_value=httpx.Response(200, json=payload)
+        return_value=httpx.Response(200, json=_open_meteo_payload())
     )
 
     async with httpx.AsyncClient() as http:
@@ -156,6 +148,7 @@ async def test_forecast_treats_missing_moon_arrays_as_none() -> None:
 
     assert forecast.daily[0].moonrise is None
     assert forecast.daily[0].moonset is None
+    assert 0 <= forecast.daily[0].moon_phase < 1
 
 
 @pytest.mark.asyncio
@@ -166,6 +159,7 @@ async def test_forecast_treats_explicit_moon_nulls_as_none() -> None:
     assert isinstance(daily_payload, dict)
     daily_payload["moonrise"] = [None]
     daily_payload["moonset"] = [None]
+    daily_payload["moon_phase"] = [0.2]
     respx.get("https://api.open-meteo.com/v1/forecast").mock(
         return_value=httpx.Response(200, json=payload)
     )
@@ -176,6 +170,7 @@ async def test_forecast_treats_explicit_moon_nulls_as_none() -> None:
 
     assert forecast.daily[0].moonrise is None
     assert forecast.daily[0].moonset is None
+    assert forecast.daily[0].moon_phase == 0.2
 
 
 @pytest.mark.asyncio

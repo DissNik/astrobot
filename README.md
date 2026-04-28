@@ -5,6 +5,7 @@ Telegram bot for astronomy trip forecasts.
 ## Local Setup
 
 ```bash
+python3 --version  # must be 3.12+
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env
