@@ -4,8 +4,8 @@ from zoneinfo import ZoneInfo
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from bot.domain.enums import LocationSource, ObservingProfile, SkyPreset, SubscriptionMode
-from bot.domain.models import Location, LocationForecast, NightForecast, Subscription
-from bot.scheduler.jobs import build_subscription_message
+from bot.domain.models import Location, LocationForecast, NightForecast, Subscription, User
+from bot.scheduler.jobs import build_subscription_message, due_subscriptions
 from bot.scheduler.runner import create_scheduler
 
 
@@ -89,11 +89,55 @@ def test_build_subscription_message_for_good_conditions_includes_only_matching_n
 
     assert message is not None
     assert "2026-04-26" not in message
-    assert "2026-04-27: 60/100" in message
-    assert "2026-04-28: 80/100" in message
+    assert "📅 <b>2026-04-27</b> — <b>60/100</b>" in message
+    assert "📅 <b>2026-04-28</b> — <b>80/100</b>" in message
 
 
 def test_create_scheduler_returns_asyncio_scheduler() -> None:
     scheduler = create_scheduler()
 
     assert isinstance(scheduler, AsyncIOScheduler)
+
+
+def test_due_subscriptions_uses_user_timezone_and_send_time() -> None:
+    subscriptions = [
+        _subscription(SubscriptionMode.DAILY_DIGEST),
+        Subscription(
+            user_id=200,
+            enabled=True,
+            mode=SubscriptionMode.DAILY_DIGEST,
+            send_time_local=time(10, 0),
+            forecast_days=2,
+            observing_profile=ObservingProfile.DEEP_SKY,
+            score_threshold=60,
+            updated_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+        ),
+    ]
+    users = {
+        100: User(
+            100,
+            "Asia/Yekaterinburg",
+            "ru",
+            3,
+            ObservingProfile.DEEP_SKY,
+            60,
+            datetime.now(tz=ZoneInfo("UTC")),
+        ),
+        200: User(
+            200,
+            "UTC",
+            "ru",
+            3,
+            ObservingProfile.DEEP_SKY,
+            60,
+            datetime.now(tz=ZoneInfo("UTC")),
+        ),
+    }
+
+    due = due_subscriptions(
+        subscriptions,
+        load_user=users.get,
+        now_utc=datetime(2026, 4, 26, 4, 0, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert [subscription.user_id for subscription in due] == [100]

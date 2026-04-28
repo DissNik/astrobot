@@ -13,11 +13,13 @@ def build_location_from_coordinates(
     bortle_class: int | None,
     enabled_for_subscription: bool,
     created_at: datetime,
+    source: LocationSource | str = LocationSource.COORDINATES,
 ) -> Location:
     name = name.strip()
     if not name:
         raise ValueError("name must not be empty")
     sky_preset = _normalize_sky_preset(sky_preset)
+    source = _normalize_location_source(source)
 
     if not -90 <= latitude <= 90:
         raise ValueError("latitude must be between -90 and 90")
@@ -34,7 +36,7 @@ def build_location_from_coordinates(
         name=name,
         latitude=latitude,
         longitude=longitude,
-        source=LocationSource.COORDINATES,
+        source=source,
         sky_preset=sky_preset,
         bortle_class=bortle_class,
         enabled_for_subscription=enabled_for_subscription,
@@ -47,3 +49,10 @@ def _normalize_sky_preset(sky_preset: SkyPreset | str) -> SkyPreset:
         return SkyPreset(sky_preset)
     except ValueError as error:
         raise ValueError("sky_preset must be a valid SkyPreset") from error
+
+
+def _normalize_location_source(source: LocationSource | str) -> LocationSource:
+    try:
+        return LocationSource(source)
+    except ValueError as error:
+        raise ValueError("source must be a valid LocationSource") from error

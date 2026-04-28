@@ -62,11 +62,43 @@ class LocationRepository:
         ).fetchall()
         return [_row_to_location(row) for row in rows]
 
+    def get_for_user(self, location_id: int, user_id: int) -> Location | None:
+        row = self.connection.execute(
+            "SELECT * FROM locations WHERE id = ? AND user_id = ?",
+            (location_id, user_id),
+        ).fetchone()
+        if row is None:
+            return None
+        return _row_to_location(row)
+
+    def rename_for_user(self, location_id: int, user_id: int, name: str) -> None:
+        self.connection.execute(
+            "UPDATE locations SET name = ? WHERE id = ? AND user_id = ?",
+            (name, location_id, user_id),
+        )
+
     def set_subscription_enabled(self, location_id: int, enabled: bool) -> None:
         self.connection.execute(
             "UPDATE locations SET enabled_for_subscription = ? WHERE id = ?",
             (int(enabled), location_id),
         )
 
+    def set_subscription_enabled_for_user(
+        self,
+        location_id: int,
+        user_id: int,
+        enabled: bool,
+    ) -> None:
+        self.connection.execute(
+            "UPDATE locations SET enabled_for_subscription = ? WHERE id = ? AND user_id = ?",
+            (int(enabled), location_id, user_id),
+        )
+
     def delete(self, location_id: int) -> None:
         self.connection.execute("DELETE FROM locations WHERE id = ?", (location_id,))
+
+    def delete_for_user(self, location_id: int, user_id: int) -> None:
+        self.connection.execute(
+            "DELETE FROM locations WHERE id = ? AND user_id = ?",
+            (location_id, user_id),
+        )

@@ -1,0 +1,326 @@
+from pathlib import Path
+
+import pytest
+
+from bot.db.connection import connect
+from bot.db.migrations import migrate
+from bot.handlers.locations import (
+    AddLocationStates,
+    add_location_coordinates_message,
+    add_location_input_message,
+    add_location_name_message,
+    delete_location_callback,
+    location_manage_callback,
+    locations_add_callback,
+    locations_list_callback,
+    rename_location_callback,
+    rename_location_message,
+)
+from bot.providers.weather_base import GeocodingCandidate
+from bot.repositories.locations import LocationRepository
+from bot.repositories.users import UserRepository
+
+
+class FakeUser:
+    def __init__(self, user_id: int) -> None:
+        self.id = user_id
+
+
+class FakeTelegramLocation:
+    def __init__(self, latitude: float, longitude: float) -> None:
+        self.latitude = latitude
+        self.longitude = longitude
+
+
+class FakeMessage:
+    def __init__(
+        self,
+        user_id: int,
+        text: str | None = None,
+        location: FakeTelegramLocation | None = None,
+    ) -> None:
+        self.from_user = FakeUser(user_id)
+        self.text = text
+        self.location = location
+        self.answers: list[str] = []
+        self.reply_markups = []
+
+    async def answer(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
+        self.answers.append(text)
+        self.reply_markups.append(reply_markup)
+
+
+class FakeCallback:
+    def __init__(
+        self,
+        user_id: int,
+        message: FakeMessage | None = None,
+        data: str | None = None,
+    ) -> None:
+        self.from_user = FakeUser(user_id)
+        self.message = message
+        self.data = data
+        self.answers: list[tuple[str | None, bool | None]] = []
+
+    async def answer(self, text: str | None = None, show_alert: bool | None = None) -> None:
+        self.answers.append((text, show_alert))
+
+
+class FakeState:
+    def __init__(self) -> None:
+        self.state = None
+        self.cleared = False
+        self.data = {}
+
+    async def set_state(self, state) -> None:  # noqa: ANN001
+        self.state = state
+
+    async def update_data(self, **kwargs) -> None:  # noqa: ANN003
+        self.data.update(kwargs)
+
+    async def get_data(self) -> dict:
+        return self.data
+
+    async def clear(self) -> None:
+        self.cleared = True
+        self.state = None
+        self.data = {}
+
+
+class FakeGeocoding:
+    def __init__(self, candidates: list[GeocodingCandidate]) -> None:
+        self.candidates = candidates
+        self.queries: list[str] = []
+
+    async def search(self, query: str, count: int = 5) -> list[GeocodingCandidate]:
+        self.queries.append(query)
+        return self.candidates[:count]
+
+
+def _repositories(tmp_path: Path) -> tuple[UserRepository, LocationRepository]:
+    connection = connect(tmp_path / "astrobot.sqlite3")
+    migrate(connection)
+    return UserRepository(connection), LocationRepository(connection)
+
+
+@pytest.mark.asyncio
+async def test_locations_add_callback_prompts_for_coordinates() -> None:
+    message = FakeMessage(user_id=100)
+    callback = FakeCallback(user_id=100, message=message)
+    state = FakeState()
+
+    await locations_add_callback(callback, state)  # type: ignore[arg-type]
+
+    assert state.state == AddLocationStates.waiting_for_location_input
+    assert message.answers == [
+        "Отправьте город, координаты в формате 45.0448, 38.976 или геолокацию Telegram."
+    ]
+    assert callback.answers == [(None, None)]
+
+
+@pytest.mark.asyncio
+async def test_add_location_coordinates_message_stores_location(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
+    message = FakeMessage(user_id=100, text="45.0448, 38.976")
+    state = FakeState()
+
+    await add_location_input_message(
+        message,
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+        geocoding=FakeGeocoding([]),  # type: ignore[arg-type]
+    )
+    await add_location_name_message(
+        FakeMessage(user_id=100, text="Поле у реки"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+    )
+
+    saved_locations = locations.list_for_user(100)
+    assert len(saved_locations) == 1
+    assert saved_locations[0].latitude == 45.0448
+    assert saved_locations[0].longitude == 38.976
+    assert saved_locations[0].name == "Поле у реки"
+    assert state.cleared is True
+    assert message.answers == ["Введите название локации."]
+
+
+@pytest.mark.asyncio
+async def test_add_location_coordinates_message_rejects_invalid_input(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
+    message = FakeMessage(user_id=100, text="нет координат")
+    state = FakeState()
+
+    await add_location_input_message(
+        message,
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+        geocoding=FakeGeocoding([]),  # type: ignore[arg-type]
+    )
+
+    assert locations.list_for_user(100) == []
+    assert state.cleared is False
+    assert message.answers == [
+        "Не смог найти локацию. Отправьте город, координаты или геолокацию Telegram."
+    ]
+
+
+@pytest.mark.asyncio
+async def test_add_location_city_message_resolves_city_and_asks_for_name(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
+    geocoding = FakeGeocoding(
+        [GeocodingCandidate("Екатеринбург", "Россия", 56.8389, 60.6057, "Asia/Yekaterinburg")]
+    )
+    state = FakeState()
+
+    await add_location_input_message(
+        FakeMessage(user_id=100, text="Екатеринбург"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+        geocoding=geocoding,  # type: ignore[arg-type]
+    )
+    await add_location_name_message(
+        FakeMessage(user_id=100, text="Дом"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+    )
+
+    saved_locations = locations.list_for_user(100)
+    assert geocoding.queries == ["Екатеринбург"]
+    assert saved_locations[0].name == "Дом"
+    assert saved_locations[0].latitude == 56.8389
+    assert saved_locations[0].longitude == 60.6057
+    assert saved_locations[0].source.value == "city"
+
+
+@pytest.mark.asyncio
+async def test_add_location_telegram_geo_stores_location_after_name(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
+    state = FakeState()
+
+    await add_location_input_message(
+        FakeMessage(user_id=100, location=FakeTelegramLocation(55.75, 37.61)),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+        geocoding=FakeGeocoding([]),  # type: ignore[arg-type]
+    )
+    await add_location_name_message(
+        FakeMessage(user_id=100, text="Площадка"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+    )
+
+    saved_locations = locations.list_for_user(100)
+    assert saved_locations[0].source.value == "telegram_geo"
+    assert saved_locations[0].name == "Площадка"
+
+
+@pytest.mark.asyncio
+async def test_locations_list_callback_shows_saved_locations(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
+    state = FakeState()
+    message = FakeMessage(user_id=100, text="45.0448 38.976")
+    await add_location_input_message(
+        message,
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+        geocoding=FakeGeocoding([]),  # type: ignore[arg-type]
+    )
+    await add_location_name_message(
+        FakeMessage(user_id=100, text="Поле"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+    )
+    list_message = FakeMessage(user_id=100)
+    callback = FakeCallback(user_id=100, message=list_message)
+
+    await locations_list_callback(callback, locations=locations)  # type: ignore[arg-type]
+
+    assert list_message.answers == ["Ваши локации:\n1. Поле — 45.0448, 38.9760"]
+    assert callback.answers == [(None, None)]
+
+
+@pytest.mark.asyncio
+async def test_location_can_be_renamed(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
+    state = FakeState()
+    await add_location_input_message(
+        FakeMessage(user_id=100, text="45.0448 38.976"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+        geocoding=FakeGeocoding([]),  # type: ignore[arg-type]
+    )
+    await add_location_name_message(
+        FakeMessage(user_id=100, text="Старое имя"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+    )
+    location_id = locations.list_for_user(100)[0].id
+    callback = FakeCallback(100, FakeMessage(100), data=f"locations:rename:{location_id}")
+
+    await rename_location_callback(callback, state, locations=locations)  # type: ignore[arg-type]
+    await rename_location_message(
+        FakeMessage(user_id=100, text="Новое имя"),
+        state,  # type: ignore[arg-type]
+        locations=locations,
+        connection=locations.connection,
+    )
+
+    assert locations.list_for_user(100)[0].name == "Новое имя"
+
+
+@pytest.mark.asyncio
+async def test_location_can_be_deleted(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
+    state = FakeState()
+    await add_location_input_message(
+        FakeMessage(user_id=100, text="45.0448 38.976"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+        geocoding=FakeGeocoding([]),  # type: ignore[arg-type]
+    )
+    await add_location_name_message(
+        FakeMessage(user_id=100, text="Поле"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+    )
+    location_id = locations.list_for_user(100)[0].id
+    callback = FakeCallback(100, FakeMessage(100), data=f"locations:delete:{location_id}")
+
+    await delete_location_callback(callback, locations=locations, connection=locations.connection)  # type: ignore[arg-type]
+
+    assert locations.list_for_user(100) == []
+
+
+def test_location_manage_callback_exists_for_saved_location() -> None:
+    assert location_manage_callback is not None
+
+
+# Backward-compatible import while old tests and callers are migrated.
+assert add_location_coordinates_message is add_location_input_message

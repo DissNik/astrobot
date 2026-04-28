@@ -1,1 +1,1 @@
-FORECAST_TITLE = "Астропрогноз"
+FORECAST_TITLE = "Астрономический прогноз"

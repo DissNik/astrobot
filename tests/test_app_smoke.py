@@ -8,7 +8,7 @@ from bot.main import create_app_context
 def test_create_app_context_initializes_dependencies(tmp_path: Path) -> None:
     settings = Settings(
         telegram_bot_token="123:abc",
-        owner_telegram_id=42,
+        owner_telegram_ids=(42,),
         database_path=tmp_path / "astrobot.sqlite3",
     )
 
