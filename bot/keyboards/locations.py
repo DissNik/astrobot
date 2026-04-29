@@ -22,14 +22,24 @@ def locations_keyboard(language: str = "en") -> InlineKeyboardMarkup:
     )
 
 
-def locations_list_keyboard(locations: list[Location]) -> InlineKeyboardMarkup | None:
+def locations_list_keyboard(
+    locations: list[Location],
+    language: str = "en",
+) -> InlineKeyboardMarkup:
+    language = normalize_language(language)
     rows = [
         [InlineKeyboardButton(text=location.name, callback_data=f"locations:manage:{location.id}")]
         for location in locations
         if location.id is not None
     ]
-    if not rows:
-        return None
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text=text("back", language),
+                callback_data="locations:open",
+            )
+        ]
+    )
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

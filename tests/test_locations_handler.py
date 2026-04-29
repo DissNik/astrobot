@@ -302,7 +302,10 @@ async def test_locations_list_callback_shows_saved_locations(tmp_path: Path) -> 
     await locations_list_callback(callback, locations=locations)  # type: ignore[arg-type]
 
     assert list_message.answers == []
-    assert list_message.edits[0][0] == "Your locations:\n1. Поле — 45.0448, 38.9760"
+    text_value, keyboard = list_message.edits[0]
+    assert text_value == "Your locations:\n1. Поле — 45.0448, 38.9760"
+    assert keyboard.inline_keyboard[-1][0].text == "Back"
+    assert keyboard.inline_keyboard[-1][0].callback_data == "locations:open"
     assert callback.answers == [(None, None)]
 
 
@@ -445,7 +448,11 @@ async def test_location_can_be_deleted(tmp_path: Path) -> None:
 
     assert locations.list_for_user(100) == []
     assert callback.message.answers == []
-    assert callback.message.edits[0][0] == "You do not have saved locations yet."
+    text_value, keyboard = callback.message.edits[0]
+    assert text_value == "You do not have saved locations yet."
+    assert keyboard.inline_keyboard == [[keyboard.inline_keyboard[0][0]]]
+    assert keyboard.inline_keyboard[0][0].text == "Back"
+    assert keyboard.inline_keyboard[0][0].callback_data == "locations:open"
 
 
 def test_location_manage_callback_exists_for_saved_location() -> None:

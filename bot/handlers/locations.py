@@ -149,7 +149,7 @@ async def locations_list_callback(
         await _edit_callback_message(
             callback.message,
             _format_locations(saved_locations, language),
-            reply_markup=locations_list_keyboard(saved_locations),
+            reply_markup=locations_list_keyboard(saved_locations, language),
         )
     await callback.answer()
 
@@ -243,7 +243,7 @@ async def delete_location_callback(
         await _edit_callback_message(
             callback.message,
             _format_locations(saved_locations, language),
-            reply_markup=locations_list_keyboard(saved_locations),
+            reply_markup=locations_list_keyboard(saved_locations, language),
         )
     await callback.answer()
 

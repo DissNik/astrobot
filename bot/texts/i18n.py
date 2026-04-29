@@ -97,6 +97,7 @@ TEXTS = {
         "enable_alerts": "Enable alerts",
         "disable_alerts": "Disable alerts",
         "delete": "Delete",
+        "back": "Back",
         "back_to_list": "Back to list",
         "subscription_text": (
             "Astronomy forecast alerts. You can enable a daily digest or disable sending."
@@ -202,6 +203,7 @@ TEXTS = {
         "enable_alerts": "Включить рассылку",
         "disable_alerts": "Отключить рассылку",
         "delete": "Удалить",
+        "back": "Назад",
         "back_to_list": "Назад к списку",
         "subscription_text": (
             "Рассылка астрономического прогноза. Можно включить ежедневный дайджест "
