@@ -91,8 +91,8 @@ def test_build_subscription_message_for_good_conditions_includes_only_matching_n
 
     assert message is not None
     assert "2026-04-26" not in message
-    assert "📅 <b>2026-04-27</b> — <b>60/100</b>" in message
-    assert "📅 <b>2026-04-28</b> — <b>80/100</b>" in message
+    assert "✅ <b>2026-04-27</b> — <b>60/100</b>" in message
+    assert "✅ <b>2026-04-28</b> — <b>80/100</b>" in message
 
 
 def test_create_scheduler_returns_asyncio_scheduler() -> None:

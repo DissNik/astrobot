@@ -41,12 +41,17 @@ def test_format_forecast_report_defaults_to_english() -> None:
 
     assert text.startswith("🔭 <b>Astronomical forecast</b>")
     assert "📍 <b>Location:</b> Dark field" in text
-    assert "📅 <b>2026-04-26</b> — <b>78/100</b>, good to go" in text
-    assert "☁️ <b>Cloud cover:</b> 15% (high: 8%)" in text
-    assert "🌙 <b>Moon:</b> 24%, visible" in text
-    assert "💧 <b>Humidity:</b> 70%" in text
-    assert "💨 <b>Wind:</b> 4.2 m/s" in text
-    assert "📝 <b>Reasons:</b> low cloud cover" in text
+    assert "✅ <b>2026-04-26</b> — <b>78/100</b>, good to go" in text
+    assert "━━━━━━━━━━━━" not in text
+    assert (
+        "<blockquote>"
+        "☁️ <b>Cloud cover:</b> 15% (high: 8%)\n"
+        "🌙 <b>Moon:</b> 24%, visible\n"
+        "💧 <b>Humidity:</b> 70%\n"
+        "💨 <b>Wind:</b> 4.2 m/s\n"
+        "📝 <b>Reasons:</b> low cloud cover"
+        "</blockquote>"
+    ) in text
 
 
 def test_format_forecast_report_supports_russian() -> None:
@@ -84,8 +89,58 @@ def test_format_forecast_report_supports_russian() -> None:
 
     assert text.startswith("🔭 <b>Астрономический прогноз</b>")
     assert "📍 <b>Локация:</b> Dark field" in text
-    assert "📅 <b>2026-04-26</b> — <b>78/100</b>, можно ехать" in text
+    assert "✅ <b>2026-04-26</b> — <b>78/100</b>, можно ехать" in text
     assert "🌙 <b>Луна:</b> 24%, не видна" in text
+
+
+def test_format_forecast_report_uses_status_icon_for_bad_and_doubtful_nights() -> None:
+    location = Location(
+        id=1,
+        user_id=10,
+        name="Dark field",
+        latitude=44.6,
+        longitude=39.7,
+        source=LocationSource.COORDINATES,
+        sky_preset=SkyPreset.DARK_SITE,
+        bortle_class=3,
+        enabled_for_subscription=True,
+        created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+    report = LocationForecast(
+        location=location,
+        nights=[
+            NightForecast(
+                night=date(2026, 4, 26),
+                score=38,
+                verdict="не стоит",
+                cloud_cover=57,
+                high_cloud_cover=0,
+                moon_phase=0.43,
+                moon_visible=False,
+                humidity=79,
+                wind_speed=10.8,
+                reasons=["умеренно высокая влажность", "сильный ветер"],
+            ),
+            NightForecast(
+                night=date(2026, 4, 27),
+                score=55,
+                verdict="сомнительно",
+                cloud_cover=40,
+                high_cloud_cover=10,
+                moon_phase=0.5,
+                moon_visible=True,
+                humidity=65,
+                wind_speed=5.1,
+                reasons=[],
+            ),
+        ],
+    )
+
+    text = format_forecast_report([report], language="ru")
+
+    assert "❌ <b>2026-04-26</b> — <b>38/100</b>, не стоит" in text
+    assert "⚠️ <b>2026-04-27</b> — <b>55/100</b>, сомнительно" in text
+    assert "</blockquote>\n\n⚠️ <b>2026-04-27</b>" in text
 
 
 def test_format_forecast_report_handles_empty_reports() -> None:

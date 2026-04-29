@@ -4,7 +4,6 @@ from bot.domain.models import LocationForecast
 from bot.texts.i18n import text, translate_reason, translate_verdict
 
 FORECAST_PARSE_MODE = "HTML"
-DAY_SEPARATOR = "━━━━━━━━━━━━"
 
 
 def format_forecast_report(reports: list[LocationForecast], language: str = "en") -> str:
@@ -24,15 +23,8 @@ def format_forecast_report(reports: list[LocationForecast], language: str = "en"
             moon_visibility = (
                 text("visible", language) if night.moon_visible else text("not_visible", language)
             )
-            lines.extend(
+            details = "\n".join(
                 [
-                    "",
-                    DAY_SEPARATOR,
-                    (
-                        f"📅 <b>{night.night:%Y-%m-%d}</b> — "
-                        f"<b>{night.score}/100</b>, "
-                        f"{escape(translate_verdict(night.verdict, language))}"
-                    ),
                     (
                         f"☁️ <b>{text('cloud_cover', language)}:</b> {night.cloud_cover}% "
                         f"({text('high_cloud_cover', language)}: {night.high_cloud_cover}%)"
@@ -46,8 +38,27 @@ def format_forecast_report(reports: list[LocationForecast], language: str = "en"
                     ),
                 ]
             )
+            lines.extend(
+                [
+                    "",
+                    (
+                        f"{_verdict_icon(night.verdict)} <b>{night.night:%Y-%m-%d}</b> — "
+                        f"<b>{night.score}/100</b>, "
+                        f"{escape(translate_verdict(night.verdict, language))}"
+                    ),
+                    f"<blockquote>{details}</blockquote>",
+                ]
+            )
 
     return "\n".join(lines)
+
+
+def _verdict_icon(verdict: str) -> str:
+    if verdict == "не стоит":
+        return "❌"
+    if verdict == "сомнительно":
+        return "⚠️"
+    return "✅"
 
 
 def _format_reasons(reasons: tuple[str, ...], language: str) -> str:
