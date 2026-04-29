@@ -90,6 +90,7 @@ def test_format_forecast_report_supports_russian() -> None:
     assert text.startswith("🔭 <b>Астрономический прогноз</b>")
     assert "📍 <b>Локация:</b> Dark field" in text
     assert "✅ <b>2026-04-26</b> — <b>78/100</b>, можно ехать" in text
+    assert "☁ <b>Облака:</b> 15%, высокие 8%" in text
     assert "☾ <b>Луна:</b> 24%, не видна" in text
 
 

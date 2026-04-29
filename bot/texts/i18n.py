@@ -118,7 +118,7 @@ TEXTS = {
         "location": "Локация",
         "clouds": "Облака",
         "cloud_cover": "Облачность",
-        "high_cloud_cover": "высокая",
+        "high_cloud_cover": "высокие",
         "moon": "Луна",
         "visible": "видна",
         "not_visible": "не видна",
