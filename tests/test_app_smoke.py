@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from pathlib import Path
 
 from bot.config import Settings
@@ -17,4 +18,7 @@ def test_create_app_context_initializes_dependencies(tmp_path: Path) -> None:
     assert context.bot is not None
     assert context.dispatcher is not None
     assert context.connection is not None
+    job = context.scheduler.get_job("subscription_dispatch")
+    assert job is not None
+    assert inspect.iscoroutinefunction(job.func)
     asyncio.run(context.close())

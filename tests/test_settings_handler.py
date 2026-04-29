@@ -1,4 +1,4 @@
-from datetime import time
+from datetime import UTC, datetime, time
 from pathlib import Path
 
 import pytest
@@ -7,6 +7,7 @@ from aiogram.exceptions import TelegramBadRequest
 from bot.db.connection import connect
 from bot.db.migrations import migrate
 from bot.domain.enums import ObservingProfile, SubscriptionMode
+from bot.domain.models import User
 from bot.handlers.settings import (
     settings_command,
     settings_time_callback,
@@ -298,13 +299,48 @@ async def test_update_subscription_time_saves_subscription_and_timezone(tmp_path
     assert subscriptions.get(100).send_time_local == time(21, 30)
     prompt_text, keyboard = callback.message.answers[0]
     labels = [button.text for row in keyboard.keyboard for button in row]
-    assert prompt_text == "Enter notification time and timezone, for example 21:30 Europe/Moscow."
+    assert prompt_text == (
+        "Enter notification time, for example 21:30. You can also add a timezone: "
+        "21:30 Europe/Moscow."
+    )
     assert "🔭 Forecast" in labels
     assert "⚙️ Settings" in labels
 
 
 @pytest.mark.asyncio
-async def test_update_subscription_time_requires_timezone_when_user_timezone_is_utc(
+async def test_update_subscription_time_without_timezone_uses_current_user_timezone(
+    tmp_path: Path,
+) -> None:
+    users, subscriptions = _repositories(tmp_path)
+    state = FakeState()
+    users.upsert(
+        User(
+            telegram_id=100,
+            timezone="Asia/Yekaterinburg",
+            language="ru",
+            forecast_days=3,
+            observing_profile=ObservingProfile.DEEP_SKY,
+            score_threshold=60,
+            created_at=datetime(2026, 4, 26, tzinfo=UTC),
+        )
+    )
+    users.connection.commit()
+
+    await settings_time_message(
+        FakeMessage(100, text="21:30"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        subscriptions=subscriptions,
+        connection=users.connection,
+    )
+
+    assert state.cleared is True
+    assert users.get(100).timezone == "Asia/Yekaterinburg"
+    assert subscriptions.get(100).send_time_local == time(21, 30)
+
+
+@pytest.mark.asyncio
+async def test_update_subscription_time_without_timezone_uses_utc_for_new_user(
     tmp_path: Path,
 ) -> None:
     users, subscriptions = _repositories(tmp_path)
@@ -318,5 +354,6 @@ async def test_update_subscription_time_requires_timezone_when_user_timezone_is_
         connection=users.connection,
     )
 
-    assert state.cleared is False
-    assert subscriptions.get(100) is None
+    assert state.cleared is True
+    assert users.get(100).timezone == "UTC"
+    assert subscriptions.get(100).send_time_local == time(21, 30)

@@ -214,18 +214,12 @@ async def settings_time_message(
         await message.answer(text("invalid_send_time", language))
         return
 
-    current_user = users.get(user_id)
     parsed_time = _parse_time_and_timezone(message.text)
     if parsed_time is None:
         await message.answer(text("invalid_send_time", language))
         return
 
     send_time, timezone = parsed_time
-    current_timezone = current_user.timezone if current_user else "UTC"
-    if timezone is None and current_timezone == "UTC":
-        await message.answer(text("invalid_send_time", language))
-        return
-
     user = _ensure_user(user_id, users)
     if timezone is not None:
         user = _replace_user_settings(user, timezone=timezone)

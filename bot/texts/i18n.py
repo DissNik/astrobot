@@ -40,11 +40,14 @@ TEXTS = {
         "menu_locations": "📍 Locations",
         "menu_subscription": "📬 Alerts",
         "menu_settings": "⚙️ Settings",
-        "enter_send_time": "Enter notification time and timezone, for example 21:30 Europe/Moscow.",
+        "enter_send_time": (
+            "Enter notification time, for example 21:30. You can also add a timezone: "
+            "21:30 Europe/Moscow."
+        ),
         "send_time_updated": "Notification time updated.",
         "invalid_send_time": (
-            "Could not parse the time. Enter time and timezone, for example "
-            "21:30 Europe/Moscow."
+            "Could not parse the time. Enter time, for example 21:30. You can also add "
+            "a timezone: 21:30 Europe/Moscow."
         ),
         "language_updated": "Language updated.",
         "language_set_en": "English language is set.",
@@ -145,12 +148,13 @@ TEXTS = {
         "menu_subscription": "📬 Рассылка",
         "menu_settings": "⚙️ Настройки",
         "enter_send_time": (
-            "Введите время рассылки и часовой пояс, например 21:30 Europe/Moscow."
+            "Введите время рассылки, например 21:30. При необходимости можно добавить "
+            "часовой пояс: 21:30 Europe/Moscow."
         ),
         "send_time_updated": "Время рассылки обновлено.",
         "invalid_send_time": (
-            "Не смог разобрать время. Введите время и часовой пояс, например "
-            "21:30 Europe/Moscow."
+            "Не смог разобрать время. Введите время, например 21:30. При необходимости "
+            "можно добавить часовой пояс: 21:30 Europe/Moscow."
         ),
         "language_updated": "Язык обновлен.",
         "language_set_en": "Установлен английский язык.",

@@ -91,10 +91,13 @@ def create_app_context(settings: Settings) -> AppContext:
     for router in _routers():
         dispatcher.include_router(router)
 
+    async def dispatch_subscriptions() -> None:
+        await _dispatch_due_subscriptions(bot, repositories, providers.weather)
+
     scheduler = create_scheduler()
     schedule_subscription_job(
         scheduler,
-        lambda: _dispatch_due_subscriptions(bot, repositories, providers.weather),
+        dispatch_subscriptions,
     )
 
     return AppContext(
