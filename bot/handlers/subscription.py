@@ -1,5 +1,6 @@
 import sqlite3
-from datetime import UTC, datetime, time
+from datetime import UTC, date, datetime, time
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
@@ -59,15 +60,28 @@ async def enable_subscription_callback(
     language = normalize_language(user.language)
     now = datetime.now(tz=UTC)
     current = subscriptions.get(callback.from_user.id)
-    subscription = Subscription(
+    send_time_local = current.send_time_local if current else time(20, 0)
+    base_subscription = Subscription(
         user_id=callback.from_user.id,
-        enabled=True,
+        enabled=current.enabled if current else False,
         mode=current.mode if current else SubscriptionMode.DAILY_DIGEST,
-        send_time_local=current.send_time_local if current else time(20, 0),
+        send_time_local=send_time_local,
         forecast_days=current.forecast_days if current else 3,
         observing_profile=current.observing_profile if current else ObservingProfile.DEEP_SKY,
         score_threshold=current.score_threshold if current else 60,
         updated_at=now,
+        last_sent_on=current.last_sent_on if current else None,
+    )
+    subscription = Subscription(
+        user_id=callback.from_user.id,
+        enabled=True,
+        mode=base_subscription.mode,
+        send_time_local=base_subscription.send_time_local,
+        forecast_days=base_subscription.forecast_days,
+        observing_profile=base_subscription.observing_profile,
+        score_threshold=base_subscription.score_threshold,
+        updated_at=now,
+        last_sent_on=_last_sent_on_for_enabled_subscription(base_subscription, user, now),
     )
     subscriptions.upsert(subscription)
     connection.commit()
@@ -100,6 +114,7 @@ async def disable_subscription_callback(
         observing_profile=current.observing_profile if current else ObservingProfile.DEEP_SKY,
         score_threshold=current.score_threshold if current else 60,
         updated_at=now,
+        last_sent_on=current.last_sent_on if current else None,
     )
     subscriptions.upsert(subscription)
     connection.commit()
@@ -128,6 +143,28 @@ def _ensure_user(user_id: int, users: UserRepository) -> User:
     )
     users.upsert(user)
     return user
+
+
+def _last_sent_on_for_enabled_subscription(
+    subscription: Subscription,
+    user: User,
+    now_utc: datetime,
+) -> date | None:
+    timezone = _safe_timezone(user.timezone)
+    local_now = now_utc.astimezone(timezone)
+    local_today = local_now.date()
+    if subscription.last_sent_on == local_today:
+        return subscription.last_sent_on
+    if local_now.time().replace(second=0, microsecond=0) >= subscription.send_time_local:
+        return local_today
+    return subscription.last_sent_on
+
+
+def _safe_timezone(timezone: str) -> ZoneInfo:
+    try:
+        return ZoneInfo(timezone)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
 
 
 def _format_subscription_menu(

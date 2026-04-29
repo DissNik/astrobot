@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -9,6 +9,7 @@ from bot.db.migrations import migrate
 from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.domain.models import Subscription, User
 from bot.handlers.subscription import (
+    _last_sent_on_for_enabled_subscription,
     disable_subscription_callback,
     enable_subscription_callback,
     subscription_callback,
@@ -128,6 +129,66 @@ async def test_enable_subscription_callback_reports_configured_time_and_timezone
         "📬 Режим: Ежедневный дайджест\n"
         "⭐ Порог: 60/100"
     )
+
+
+def test_enable_subscription_after_configured_time_skips_current_local_day() -> None:
+    user = User(
+        telegram_id=100,
+        timezone="Europe/Moscow",
+        language="ru",
+        forecast_days=3,
+        observing_profile=ObservingProfile.DEEP_SKY,
+        score_threshold=60,
+        created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+    subscription = Subscription(
+        user_id=100,
+        enabled=False,
+        mode=SubscriptionMode.DAILY_DIGEST,
+        send_time_local=time(12, 52),
+        forecast_days=3,
+        observing_profile=ObservingProfile.DEEP_SKY,
+        score_threshold=60,
+        updated_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+
+    last_sent_on = _last_sent_on_for_enabled_subscription(
+        subscription,
+        user,
+        now_utc=datetime(2026, 4, 26, 12, 0, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert last_sent_on == date(2026, 4, 26)
+
+
+def test_enable_subscription_before_configured_time_keeps_subscription_due_today() -> None:
+    user = User(
+        telegram_id=100,
+        timezone="Europe/Moscow",
+        language="ru",
+        forecast_days=3,
+        observing_profile=ObservingProfile.DEEP_SKY,
+        score_threshold=60,
+        created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+    subscription = Subscription(
+        user_id=100,
+        enabled=False,
+        mode=SubscriptionMode.DAILY_DIGEST,
+        send_time_local=time(12, 52),
+        forecast_days=3,
+        observing_profile=ObservingProfile.DEEP_SKY,
+        score_threshold=60,
+        updated_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+
+    last_sent_on = _last_sent_on_for_enabled_subscription(
+        subscription,
+        user,
+        now_utc=datetime(2026, 4, 26, 9, 0, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert last_sent_on is None
 
 
 @pytest.mark.asyncio
