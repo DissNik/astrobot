@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import UTC, datetime, time
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
@@ -207,18 +208,27 @@ async def settings_time_message(
     subscriptions: SubscriptionRepository,
     connection: sqlite3.Connection,
 ) -> None:
-    send_time = _parse_time(message.text)
     user_id = _message_user_id(message)
     language = _language_for_user(user_id, users)
-    if send_time is None:
-        await message.answer(text("invalid_send_time", language))
-        return
-
     if user_id is None:
         await message.answer(text("invalid_send_time", language))
         return
 
+    current_user = users.get(user_id)
+    parsed_time = _parse_time_and_timezone(message.text)
+    if parsed_time is None:
+        await message.answer(text("invalid_send_time", language))
+        return
+
+    send_time, timezone = parsed_time
+    current_timezone = current_user.timezone if current_user else "UTC"
+    if timezone is None and current_timezone == "UTC":
+        await message.answer(text("invalid_send_time", language))
+        return
+
     user = _ensure_user(user_id, users)
+    if timezone is not None:
+        user = _replace_user_settings(user, timezone=timezone)
     subscription = _ensure_subscription(user, subscriptions)
     users.upsert(user)
     subscriptions.upsert(_replace_subscription_settings(subscription, send_time_local=send_time))
@@ -247,6 +257,7 @@ def _format_settings(
     forecast_days = user.forecast_days if user else 3
     profile = user.observing_profile if user else ObservingProfile.DEEP_SKY
     threshold = subscription.score_threshold if subscription else 60
+    timezone = user.timezone if user else "UTC"
     send_time = (
         subscription.send_time_local.isoformat(timespec="minutes") if subscription else "20:00"
     )
@@ -259,7 +270,7 @@ def _format_settings(
         f"🌙 {_settings_label('forecast', language)}: {forecast_days} {text('nights', language)}\n"
         f"🔭 {_settings_label('profile', language)}: {_format_profile(profile, language)}\n"
         f"🔔 {_settings_label('subscription', language)}: {subscription_state}\n"
-        f"🕘 {_settings_label('time', language)}: {send_time}\n"
+        f"🕘 {_settings_label('time', language)}: {send_time} {timezone}\n"
         f"📬 {_settings_label('mode', language)}: {_format_mode(mode, language)}\n"
         f"⭐ {_settings_label('threshold', language)}: {threshold}/100"
     )
@@ -391,10 +402,11 @@ def _replace_user_settings(
     observing_profile: ObservingProfile | None = None,
     score_threshold: int | None = None,
     language: str | None = None,
+    timezone: str | None = None,
 ) -> User:
     return User(
         telegram_id=user.telegram_id,
-        timezone=user.timezone,
+        timezone=timezone or user.timezone,
         language=normalize_language(language or user.language),
         forecast_days=forecast_days if forecast_days is not None else user.forecast_days,
         observing_profile=observing_profile or user.observing_profile,
@@ -459,6 +471,33 @@ def _parse_time(text: str | None) -> time | None:
         return time.fromisoformat(text.strip())
     except ValueError:
         return None
+
+
+def _parse_time_and_timezone(text_value: str | None) -> tuple[time, str | None] | None:
+    if text_value is None:
+        return None
+
+    parts = text_value.strip().split(maxsplit=1)
+    if not parts:
+        return None
+
+    parsed_time = _parse_time(parts[0])
+    if parsed_time is None:
+        return None
+
+    if len(parts) == 1:
+        return parsed_time, None
+
+    timezone = parts[1].strip()
+    if not timezone:
+        return None
+
+    try:
+        ZoneInfo(timezone)
+    except ZoneInfoNotFoundError:
+        return None
+
+    return parsed_time, timezone
 
 
 def _language_for_user(user_id: int | None, users: UserRepository) -> str:

@@ -184,7 +184,7 @@ async def test_update_forecast_days_edits_settings_message_with_visual_summary(
         "🌙 Forecast: 5 nights\n"
         "🔭 Profile: Deep-sky\n"
         "🔔 Subscription: disabled\n"
-        "🕘 Time: 20:00\n"
+        "🕘 Time: 20:00 UTC\n"
         "📬 Mode: Daily digest\n"
         "⭐ Threshold: 60/100"
     )
@@ -279,12 +279,37 @@ async def test_update_subscription_mode_saves_subscription(tmp_path: Path) -> No
 
 
 @pytest.mark.asyncio
-async def test_update_subscription_time_saves_subscription(tmp_path: Path) -> None:
+async def test_update_subscription_time_saves_subscription_and_timezone(tmp_path: Path) -> None:
     users, subscriptions = _repositories(tmp_path)
     state = FakeState()
     callback = FakeCallback(100, "settings:time", FakeMessage(100))
 
     await settings_time_callback(callback, state, users=users)  # type: ignore[arg-type]
+    await settings_time_message(
+        FakeMessage(100, text="21:30 Europe/Moscow"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        subscriptions=subscriptions,
+        connection=users.connection,
+    )
+
+    assert state.cleared is True
+    assert users.get(100).timezone == "Europe/Moscow"
+    assert subscriptions.get(100).send_time_local == time(21, 30)
+    prompt_text, keyboard = callback.message.answers[0]
+    labels = [button.text for row in keyboard.keyboard for button in row]
+    assert prompt_text == "Enter notification time and timezone, for example 21:30 Europe/Moscow."
+    assert "🔭 Forecast" in labels
+    assert "⚙️ Settings" in labels
+
+
+@pytest.mark.asyncio
+async def test_update_subscription_time_requires_timezone_when_user_timezone_is_utc(
+    tmp_path: Path,
+) -> None:
+    users, subscriptions = _repositories(tmp_path)
+    state = FakeState()
+
     await settings_time_message(
         FakeMessage(100, text="21:30"),
         state,  # type: ignore[arg-type]
@@ -293,10 +318,5 @@ async def test_update_subscription_time_saves_subscription(tmp_path: Path) -> No
         connection=users.connection,
     )
 
-    assert state.cleared is True
-    assert subscriptions.get(100).send_time_local == time(21, 30)
-    prompt_text, keyboard = callback.message.answers[0]
-    labels = [button.text for row in keyboard.keyboard for button in row]
-    assert prompt_text == "Enter notification time in HH:MM format."
-    assert "🔭 Forecast" in labels
-    assert "⚙️ Settings" in labels
+    assert state.cleared is False
+    assert subscriptions.get(100) is None
