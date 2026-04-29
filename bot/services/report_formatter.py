@@ -26,14 +26,14 @@ def format_forecast_report(reports: list[LocationForecast], language: str = "en"
             details = "\n".join(
                 [
                     (
-                        f"☁️ <b>{text('cloud_cover', language)}:</b> {night.cloud_cover}% "
-                        f"({text('high_cloud_cover', language)}: {night.high_cloud_cover}%)"
+                        f"☁ <b>{text('clouds', language)}:</b> {night.cloud_cover}%, "
+                        f"{text('high_cloud_cover', language)} {night.high_cloud_cover}%"
                     ),
-                    f"🌙 <b>{text('moon', language)}:</b> {moon_percent}%, {moon_visibility}",
-                    f"💧 <b>{text('humidity', language)}:</b> {night.humidity}%",
-                    f"💨 <b>{text('wind', language)}:</b> {night.wind_speed:.1f} m/s",
+                    f"☾ <b>{text('moon', language)}:</b> {moon_percent}%, {moon_visibility}",
+                    f"◦ <b>{text('humidity', language)}:</b> {night.humidity}%",
+                    f"→ <b>{text('wind', language)}:</b> {night.wind_speed:.1f} m/s",
                     (
-                        f"📝 <b>{text('reasons', language)}:</b> "
+                        f"× <b>{text('blocking', language)}:</b> "
                         f"{_format_reasons(night.reasons, language)}"
                     ),
                 ]

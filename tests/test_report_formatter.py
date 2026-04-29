@@ -45,11 +45,11 @@ def test_format_forecast_report_defaults_to_english() -> None:
     assert "━━━━━━━━━━━━" not in text
     assert (
         "<blockquote>"
-        "☁️ <b>Cloud cover:</b> 15% (high: 8%)\n"
-        "🌙 <b>Moon:</b> 24%, visible\n"
-        "💧 <b>Humidity:</b> 70%\n"
-        "💨 <b>Wind:</b> 4.2 m/s\n"
-        "📝 <b>Reasons:</b> low cloud cover"
+        "☁ <b>Clouds:</b> 15%, high 8%\n"
+        "☾ <b>Moon:</b> 24%, visible\n"
+        "◦ <b>Humidity:</b> 70%\n"
+        "→ <b>Wind:</b> 4.2 m/s\n"
+        "× <b>Blocking:</b> low cloud cover"
         "</blockquote>"
     ) in text
 
@@ -90,7 +90,7 @@ def test_format_forecast_report_supports_russian() -> None:
     assert text.startswith("🔭 <b>Астрономический прогноз</b>")
     assert "📍 <b>Локация:</b> Dark field" in text
     assert "✅ <b>2026-04-26</b> — <b>78/100</b>, можно ехать" in text
-    assert "🌙 <b>Луна:</b> 24%, не видна" in text
+    assert "☾ <b>Луна:</b> 24%, не видна" in text
 
 
 def test_format_forecast_report_uses_status_icon_for_bad_and_doubtful_nights() -> None:
