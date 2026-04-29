@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, Message
 
 from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.domain.models import Subscription, User
+from bot.keyboards.menu import main_menu_keyboard
 from bot.keyboards.settings import settings_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
@@ -72,6 +73,7 @@ async def update_language_callback(
         users,
         subscriptions,
         language,
+        refresh_main_menu=True,
     )
 
 
@@ -305,6 +307,7 @@ async def _send_updated_settings(
     users: UserRepository,
     subscriptions: SubscriptionRepository,
     language: str,
+    refresh_main_menu: bool = False,
 ) -> None:
     if callback.message:
         settings_text = _format_settings(callback.from_user.id, users, subscriptions, language)
@@ -316,6 +319,12 @@ async def _send_updated_settings(
         except TelegramBadRequest as error:
             if "message is not modified" not in str(error):
                 raise
+        if refresh_main_menu:
+            menu_message = await callback.message.answer(
+                "\u2060",
+                reply_markup=main_menu_keyboard(language),
+            )
+            await menu_message.delete()
     await callback.answer()
 
 

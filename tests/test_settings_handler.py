@@ -26,6 +26,14 @@ class FakeUser:
         self.id = user_id
 
 
+class FakeSentMessage:
+    def __init__(self) -> None:
+        self.deleted = False
+
+    async def delete(self) -> None:
+        self.deleted = True
+
+
 class FakeMessage:
     def __init__(
         self,
@@ -38,9 +46,13 @@ class FakeMessage:
         self.edit_error = edit_error
         self.answers: list[tuple[str, object | None]] = []
         self.edits: list[tuple[str, object | None]] = []
+        self.sent_messages: list[FakeSentMessage] = []
 
-    async def answer(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
+    async def answer(self, text: str, reply_markup=None) -> FakeSentMessage:  # noqa: ANN001
         self.answers.append((text, reply_markup))
+        sent_message = FakeSentMessage()
+        self.sent_messages.append(sent_message)
+        return sent_message
 
     async def edit_text(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
         if self.edit_error is not None:
@@ -125,7 +137,13 @@ async def test_update_language_does_not_send_main_menu_message(tmp_path: Path) -
         connection=users.connection,
     )  # type: ignore[arg-type]
 
-    assert callback.message.answers == []
+    assert len(callback.message.answers) == 1
+    text, keyboard = callback.message.answers[0]
+    labels = [button.text for row in keyboard.keyboard for button in row]
+    assert text == "\u2060"
+    assert "🔭 Прогноз" in labels
+    assert "⚙️ Настройки" in labels
+    assert callback.message.sent_messages[0].deleted is True
 
 
 @pytest.mark.asyncio
