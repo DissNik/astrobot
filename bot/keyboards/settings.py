@@ -44,6 +44,8 @@ def settings_keyboard(language: str = "en") -> InlineKeyboardMarkup:
                     text=text("settings_daily_digest", language),
                     callback_data="settings:mode:daily_digest",
                 ),
+            ],
+            [
                 InlineKeyboardButton(
                     text=text("settings_good_conditions_only", language),
                     callback_data="settings:mode:good_conditions_only",
@@ -58,6 +60,8 @@ def settings_keyboard(language: str = "en") -> InlineKeyboardMarkup:
                     text=text("settings_threshold_60", language),
                     callback_data="settings:threshold:60",
                 ),
+            ],
+            [
                 InlineKeyboardButton(
                     text=text("settings_threshold_70", language),
                     callback_data="settings:threshold:70",

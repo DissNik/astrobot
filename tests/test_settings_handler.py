@@ -114,7 +114,7 @@ async def test_update_language_saves_selected_language(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_language_refreshes_main_menu_keyboard(tmp_path: Path) -> None:
+async def test_update_language_does_not_send_main_menu_message(tmp_path: Path) -> None:
     users, subscriptions = _repositories(tmp_path)
     callback = FakeCallback(100, "settings:language:ru", FakeMessage(100))
 
@@ -125,10 +125,7 @@ async def test_update_language_refreshes_main_menu_keyboard(tmp_path: Path) -> N
         connection=users.connection,
     )  # type: ignore[arg-type]
 
-    _, keyboard = callback.message.answers[-1]
-    labels = [button.text for row in keyboard.keyboard for button in row]
-    assert "🔭 Прогноз" in labels
-    assert "⚙️ Настройки" in labels
+    assert callback.message.answers == []
 
 
 @pytest.mark.asyncio
@@ -164,7 +161,6 @@ async def test_update_forecast_days_edits_settings_message_with_visual_summary(
     text, keyboard = callback.message.edits[0]
     assert callback.message.answers == []
     assert text == (
-        "Forecast horizon updated.\n\n"
         "⚙️ Profile and subscription settings\n\n"
         "🌙 Forecast: 5 nights\n"
         "🔭 Profile: Deep-sky\n"
@@ -196,6 +192,22 @@ async def test_update_forecast_days_ignores_unchanged_settings_message(
 
     assert message.answers == []
     assert callback.answers == [(None, None)]
+
+
+@pytest.mark.asyncio
+async def test_update_language_edits_settings_without_status_prefix(tmp_path: Path) -> None:
+    users, subscriptions = _repositories(tmp_path)
+    callback = FakeCallback(100, "settings:language:ru", FakeMessage(100))
+
+    await update_language_callback(
+        callback,
+        users=users,
+        subscriptions=subscriptions,
+        connection=users.connection,
+    )  # type: ignore[arg-type]
+
+    assert callback.message.edits[0][0].startswith("⚙️ Настройки профиля и рассылки")
+    assert "Язык обновлен" not in callback.message.edits[0][0]
 
 
 @pytest.mark.asyncio

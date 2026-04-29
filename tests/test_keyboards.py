@@ -1,5 +1,6 @@
 from bot.keyboards.locations import locations_keyboard
 from bot.keyboards.menu import main_menu_keyboard
+from bot.keyboards.settings import settings_keyboard
 from bot.keyboards.subscription import subscription_keyboard
 
 
@@ -36,3 +37,13 @@ def test_keyboards_emit_known_callback_data() -> None:
         "subscription:enable",
         "subscription:disable",
     }
+
+
+def test_settings_keyboard_uses_wide_rows_for_long_russian_labels() -> None:
+    keyboard = settings_keyboard("ru")
+    rows = [[button.callback_data for button in row] for row in keyboard.inline_keyboard]
+
+    assert ["settings:mode:daily_digest"] in rows
+    assert ["settings:mode:good_conditions_only"] in rows
+    assert ["settings:threshold:50", "settings:threshold:60"] in rows
+    assert ["settings:threshold:70", "settings:threshold:80"] in rows

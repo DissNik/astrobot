@@ -10,7 +10,6 @@ from aiogram.types import CallbackQuery, Message
 
 from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.domain.models import Subscription, User
-from bot.keyboards.menu import main_menu_keyboard
 from bot.keyboards.settings import settings_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
@@ -72,9 +71,7 @@ async def update_language_callback(
         callback,
         users,
         subscriptions,
-        text("language_updated", language),
         language,
-        refresh_main_menu=True,
     )
 
 
@@ -100,7 +97,6 @@ async def update_forecast_days_callback(
         callback,
         users,
         subscriptions,
-        text("days_updated", language),
         language,
     )
 
@@ -127,7 +123,6 @@ async def update_profile_callback(
         callback,
         users,
         subscriptions,
-        text("profile_updated", language),
         language,
     )
 
@@ -154,7 +149,6 @@ async def update_threshold_callback(
         callback,
         users,
         subscriptions,
-        text("threshold_updated", language),
         language,
     )
 
@@ -181,7 +175,6 @@ async def update_subscription_mode_callback(
         callback,
         users,
         subscriptions,
-        text("mode_updated", language),
         language,
     )
 
@@ -311,25 +304,18 @@ async def _send_updated_settings(
     callback: CallbackQuery,
     users: UserRepository,
     subscriptions: SubscriptionRepository,
-    message: str,
     language: str,
-    refresh_main_menu: bool = False,
 ) -> None:
     if callback.message:
         settings_text = _format_settings(callback.from_user.id, users, subscriptions, language)
         try:
             await callback.message.edit_text(
-                f"{message}\n\n{settings_text}",
+                settings_text,
                 reply_markup=settings_keyboard(language),
             )
         except TelegramBadRequest as error:
             if "message is not modified" not in str(error):
                 raise
-        if refresh_main_menu:
-            await callback.message.answer(
-                text("main_menu", language),
-                reply_markup=main_menu_keyboard(language),
-            )
     await callback.answer()
 
 
