@@ -192,7 +192,10 @@ async def settings_time_callback(
     await state.set_state(SettingsStates.waiting_for_send_time)
     language = _language_for_user(callback.from_user.id, users)
     if callback.message:
-        await callback.message.answer(text("enter_send_time", language))
+        await callback.message.answer(
+            text("enter_send_time", language),
+            reply_markup=main_menu_keyboard(language),
+        )
     await callback.answer()
 
 
@@ -324,11 +327,10 @@ async def _send_updated_settings(
             if "message is not modified" not in str(error):
                 raise
         if refresh_main_menu:
-            menu_message = await callback.message.answer(
+            await callback.message.answer(
                 "\u2060",
                 reply_markup=main_menu_keyboard(language),
             )
-            await menu_message.delete()
     await callback.answer()
 
 

@@ -143,7 +143,7 @@ async def test_update_language_does_not_send_main_menu_message(tmp_path: Path) -
     assert text == "\u2060"
     assert "🔭 Прогноз" in labels
     assert "⚙️ Настройки" in labels
-    assert callback.message.sent_messages[0].deleted is True
+    assert callback.message.sent_messages[0].deleted is False
 
 
 @pytest.mark.asyncio
@@ -295,4 +295,8 @@ async def test_update_subscription_time_saves_subscription(tmp_path: Path) -> No
 
     assert state.cleared is True
     assert subscriptions.get(100).send_time_local == time(21, 30)
-    assert callback.message.answers == [("Enter notification time in HH:MM format.", None)]
+    prompt_text, keyboard = callback.message.answers[0]
+    labels = [button.text for row in keyboard.keyboard for button in row]
+    assert prompt_text == "Enter notification time in HH:MM format."
+    assert "🔭 Forecast" in labels
+    assert "⚙️ Settings" in labels
