@@ -46,6 +46,8 @@ TEXTS = {
             "Could not parse the time. Enter it in HH:MM format, for example 21:30."
         ),
         "language_updated": "Language updated.",
+        "language_set_en": "English language is set.",
+        "language_set_ru": "Russian language is set.",
         "days_updated": "Forecast horizon updated.",
         "profile_updated": "Observing profile updated.",
         "threshold_updated": "Good conditions threshold updated.",
@@ -146,6 +148,8 @@ TEXTS = {
             "Не смог разобрать время. Введите время в формате HH:MM, например 21:30."
         ),
         "language_updated": "Язык обновлен.",
+        "language_set_en": "Установлен английский язык.",
+        "language_set_ru": "Установлен русский язык.",
         "days_updated": "Горизонт прогноза обновлен.",
         "profile_updated": "Профиль наблюдений обновлен.",
         "threshold_updated": "Порог хороших условий обновлен.",

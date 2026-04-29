@@ -140,7 +140,7 @@ async def test_update_language_does_not_send_main_menu_message(tmp_path: Path) -
     assert len(callback.message.answers) == 1
     text, keyboard = callback.message.answers[0]
     labels = [button.text for row in keyboard.keyboard for button in row]
-    assert text == "\u2060"
+    assert text == "Установлен русский язык."
     assert "🔭 Прогноз" in labels
     assert "⚙️ Настройки" in labels
     assert callback.message.sent_messages[0].deleted is False

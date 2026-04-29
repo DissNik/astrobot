@@ -328,7 +328,7 @@ async def _send_updated_settings(
                 raise
         if refresh_main_menu:
             await callback.message.answer(
-                "\u2060",
+                text(f"language_set_{language}", language),
                 reply_markup=main_menu_keyboard(language),
             )
     await callback.answer()
