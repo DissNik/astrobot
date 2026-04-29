@@ -19,21 +19,9 @@ from bot.providers.geocoding import GeocodingClient
 from bot.repositories.locations import LocationRepository
 from bot.repositories.users import UserRepository
 from bot.services.location_service import build_location_from_coordinates
-from bot.texts.i18n import DEFAULT_LANGUAGE
+from bot.texts.i18n import DEFAULT_LANGUAGE, normalize_language, text
 
 router = Router()
-
-LOCATIONS_TEXT = "Observing locations. Manage your saved places here."
-ADD_LOCATION_PROMPT = (
-    "Send a city, coordinates like 45.0448, 38.976, or a Telegram location."
-)
-INVALID_COORDINATES_TEXT = (
-    "I could not find the location. Send a city, coordinates, or a Telegram location."
-)
-LOCATION_NAME_PROMPT = "Enter the location name."
-INVALID_LOCATION_NAME_TEXT = "Location name must not be empty."
-LOCATION_NOT_FOUND_TEXT = "I could not find this location. Open the location list again."
-RENAME_LOCATION_PROMPT = "Enter a new location name."
 
 
 class AddLocationStates(StatesGroup):
@@ -44,22 +32,35 @@ class AddLocationStates(StatesGroup):
 
 @router.message(Command("locations"))
 @router.message(F.text == "📍 Локации")
-async def locations_command(message: Message) -> None:
-    await message.answer(LOCATIONS_TEXT, reply_markup=locations_keyboard())
+@router.message(F.text == "📍 Locations")
+async def locations_command(message: Message, users: UserRepository | None = None) -> None:
+    language = _language_for_message(message, users)
+    await message.answer(
+        text("locations_text", language), reply_markup=locations_keyboard(language)
+    )
 
 
 @router.callback_query(F.data == "locations:open")
-async def locations_callback(callback: CallbackQuery) -> None:
+async def locations_callback(callback: CallbackQuery, users: UserRepository | None = None) -> None:
+    language = _language_for_user(callback.from_user.id, users)
     if callback.message:
-        await callback.message.answer(LOCATIONS_TEXT, reply_markup=locations_keyboard())
+        await callback.message.answer(
+            text("locations_text", language),
+            reply_markup=locations_keyboard(language),
+        )
     await callback.answer()
 
 
 @router.callback_query(F.data == "locations:add")
-async def locations_add_callback(callback: CallbackQuery, state: FSMContext) -> None:
+async def locations_add_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+    users: UserRepository | None = None,
+) -> None:
     await state.set_state(AddLocationStates.waiting_for_location_input)
+    language = _language_for_user(callback.from_user.id, users)
     if callback.message:
-        await callback.message.answer(ADD_LOCATION_PROMPT)
+        await callback.message.answer(text("add_location_prompt", language))
     await callback.answer()
 
 
@@ -73,9 +74,10 @@ async def add_location_input_message(
     geocoding: GeocodingClient,
 ) -> None:
     user_id = _message_user_id(message)
+    language = _language_for_user(user_id, users)
     resolved_location = await _resolve_location_input(message, geocoding)
     if user_id is None or resolved_location is None:
-        await message.answer(INVALID_COORDINATES_TEXT)
+        await message.answer(text("invalid_location_input", language))
         return
 
     latitude, longitude, source, default_name = resolved_location
@@ -86,7 +88,7 @@ async def add_location_input_message(
         default_name=default_name,
     )
     await state.set_state(AddLocationStates.waiting_for_name)
-    await message.answer(LOCATION_NAME_PROMPT)
+    await message.answer(text("location_name_prompt", language))
 
 
 add_location_coordinates_message = add_location_input_message
@@ -101,24 +103,16 @@ async def add_location_name_message(
     connection: sqlite3.Connection,
 ) -> None:
     user_id = _message_user_id(message)
+    language = _language_for_user(user_id, users)
     data = await state.get_data()
     name = _normalize_location_name(message.text, data.get("default_name"))
     if user_id is None or not name:
-        await message.answer(INVALID_LOCATION_NAME_TEXT)
+        await message.answer(text("invalid_location_name", language))
         return
 
     now = datetime.now(tz=UTC)
-    users.upsert(
-        User(
-            telegram_id=user_id,
-            timezone="UTC",
-            language=DEFAULT_LANGUAGE,
-            forecast_days=3,
-            observing_profile=ObservingProfile.DEEP_SKY,
-            score_threshold=60,
-            created_at=now,
-        )
-    )
+    user = _ensure_user(user_id, users, now)
+    language = normalize_language(user.language)
     location = locations.add(
         build_location_from_coordinates(
             user_id=user_id,
@@ -134,33 +128,46 @@ async def add_location_name_message(
     )
     connection.commit()
     await state.clear()
-    await message.answer(f"Location saved: {location.name}", reply_markup=main_menu_keyboard())
+    await message.answer(
+        text("location_saved", language).format(name=location.name),
+        reply_markup=main_menu_keyboard(language),
+    )
 
 
 @router.callback_query(F.data == "locations:list")
-async def locations_list_callback(callback: CallbackQuery, locations: LocationRepository) -> None:
+async def locations_list_callback(
+    callback: CallbackQuery,
+    locations: LocationRepository,
+    users: UserRepository | None = None,
+) -> None:
     user_id = callback.from_user.id
+    language = _language_for_user(user_id, users)
     saved_locations = locations.list_for_user(user_id)
     if callback.message:
         await callback.message.answer(
-            _format_locations(saved_locations),
+            _format_locations(saved_locations, language),
             reply_markup=locations_list_keyboard(saved_locations),
         )
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("locations:manage:"))
-async def location_manage_callback(callback: CallbackQuery, locations: LocationRepository) -> None:
+async def location_manage_callback(
+    callback: CallbackQuery,
+    locations: LocationRepository,
+    users: UserRepository | None = None,
+) -> None:
+    language = _language_for_user(callback.from_user.id, users)
     location_id = _parse_location_callback_id(callback.data, "locations:manage:")
     location = _find_location_for_callback(callback, locations, location_id)
     if location is None:
-        await callback.answer(LOCATION_NOT_FOUND_TEXT, show_alert=True)
+        await callback.answer(text("location_not_found_short", language), show_alert=True)
         return
 
     if callback.message:
         await callback.message.answer(
-            _format_location_details(location),
-            reply_markup=location_manage_keyboard(location),
+            _format_location_details(location, language),
+            reply_markup=location_manage_keyboard(location, language),
         )
     await callback.answer()
 
@@ -170,17 +177,19 @@ async def rename_location_callback(
     callback: CallbackQuery,
     state: FSMContext,
     locations: LocationRepository,
+    users: UserRepository | None = None,
 ) -> None:
+    language = _language_for_user(callback.from_user.id, users)
     location_id = _parse_location_callback_id(callback.data, "locations:rename:")
     location = _find_location_for_callback(callback, locations, location_id)
     if location is None or location.id is None:
-        await callback.answer(LOCATION_NOT_FOUND_TEXT, show_alert=True)
+        await callback.answer(text("location_not_found_short", language), show_alert=True)
         return
 
     await state.update_data(rename_location_id=location.id)
     await state.set_state(AddLocationStates.waiting_for_rename)
     if callback.message:
-        await callback.message.answer(RENAME_LOCATION_PROMPT)
+        await callback.message.answer(text("rename_location_prompt", language))
     await callback.answer()
 
 
@@ -190,19 +199,24 @@ async def rename_location_message(
     state: FSMContext,
     locations: LocationRepository,
     connection: sqlite3.Connection,
+    users: UserRepository | None = None,
 ) -> None:
     user_id = _message_user_id(message)
+    language = _language_for_user(user_id, users)
     data = await state.get_data()
     location_id = data.get("rename_location_id")
     name = _normalize_location_name(message.text, None)
     if user_id is None or location_id is None or not name:
-        await message.answer(INVALID_LOCATION_NAME_TEXT)
+        await message.answer(text("invalid_location_name", language))
         return
 
     locations.rename_for_user(int(location_id), user_id, name)
     connection.commit()
     await state.clear()
-    await message.answer(f"Location renamed: {name}", reply_markup=main_menu_keyboard())
+    await message.answer(
+        text("location_renamed", language).format(name=name),
+        reply_markup=main_menu_keyboard(language),
+    )
 
 
 @router.callback_query(F.data.startswith("locations:delete:"))
@@ -210,16 +224,21 @@ async def delete_location_callback(
     callback: CallbackQuery,
     locations: LocationRepository,
     connection: sqlite3.Connection,
+    users: UserRepository | None = None,
 ) -> None:
+    language = _language_for_user(callback.from_user.id, users)
     location_id = _parse_location_callback_id(callback.data, "locations:delete:")
     if location_id is None:
-        await callback.answer(LOCATION_NOT_FOUND_TEXT, show_alert=True)
+        await callback.answer(text("location_not_found_short", language), show_alert=True)
         return
 
     locations.delete_for_user(location_id, callback.from_user.id)
     connection.commit()
     if callback.message:
-        await callback.message.answer("Location deleted.", reply_markup=main_menu_keyboard())
+        await callback.message.answer(
+            text("location_deleted", language),
+            reply_markup=main_menu_keyboard(language),
+        )
     await callback.answer()
 
 
@@ -228,19 +247,25 @@ async def toggle_location_subscription_callback(
     callback: CallbackQuery,
     locations: LocationRepository,
     connection: sqlite3.Connection,
+    users: UserRepository | None = None,
 ) -> None:
+    language = _language_for_user(callback.from_user.id, users)
     location_id = _parse_location_callback_id(callback.data, "locations:toggle_subscription:")
     location = _find_location_for_callback(callback, locations, location_id)
     if location is None or location.id is None:
-        await callback.answer(LOCATION_NOT_FOUND_TEXT, show_alert=True)
+        await callback.answer(text("location_not_found_short", language), show_alert=True)
         return
 
     enabled = not location.enabled_for_subscription
     locations.set_subscription_enabled_for_user(location.id, callback.from_user.id, enabled)
     connection.commit()
-    text = "Location enabled for alerts." if enabled else "Location disabled for alerts."
+    message_text = (
+        text("location_alerts_enabled", language)
+        if enabled
+        else text("location_alerts_disabled", language)
+    )
     if callback.message:
-        await callback.message.answer(text, reply_markup=main_menu_keyboard())
+        await callback.message.answer(message_text, reply_markup=main_menu_keyboard(language))
     await callback.answer()
 
 
@@ -265,14 +290,17 @@ def _parse_coordinates(text: str | None) -> tuple[float, float] | None:
 
 
 def _default_location_name(latitude: float, longitude: float) -> str:
-    return f"Location {latitude:.4f}, {longitude:.4f}"
+    return text("location_default_name", DEFAULT_LANGUAGE).format(
+        latitude=latitude,
+        longitude=longitude,
+    )
 
 
-def _format_locations(locations: list) -> str:
+def _format_locations(locations: list, language: str = DEFAULT_LANGUAGE) -> str:
     if not locations:
-        return "You do not have saved locations yet."
+        return text("no_saved_locations", language)
 
-    lines = ["Your locations:"]
+    lines = [text("your_locations", language)]
     for index, location in enumerate(locations, start=1):
         lines.append(
             f"{index}. {location.name} — {location.latitude:.4f}, {location.longitude:.4f}"
@@ -284,6 +312,37 @@ def _message_user_id(message: Message) -> int | None:
     if message.from_user is None:
         return None
     return message.from_user.id
+
+
+def _ensure_user(user_id: int, users: UserRepository, now: datetime) -> User:
+    user = users.get(user_id)
+    if user is not None:
+        return user
+
+    user = User(
+        telegram_id=user_id,
+        timezone="UTC",
+        language=DEFAULT_LANGUAGE,
+        forecast_days=3,
+        observing_profile=ObservingProfile.DEEP_SKY,
+        score_threshold=60,
+        created_at=now,
+    )
+    users.upsert(user)
+    return user
+
+
+def _language_for_message(message: Message, users: UserRepository | None) -> str:
+    return _language_for_user(_message_user_id(message), users)
+
+
+def _language_for_user(user_id: int | None, users: UserRepository | None) -> str:
+    if user_id is None or users is None:
+        return DEFAULT_LANGUAGE
+    user = users.get(user_id)
+    if user is None:
+        return DEFAULT_LANGUAGE
+    return normalize_language(user.language)
 
 
 async def _resolve_location_input(
@@ -354,19 +413,19 @@ def _find_location_for_callback(
     return locations.get_for_user(location_id, callback.from_user.id)
 
 
-def _format_location_details(location) -> str:  # noqa: ANN001
-    subscription = "enabled" if location.enabled_for_subscription else "disabled"
+def _format_location_details(location, language: str = DEFAULT_LANGUAGE) -> str:  # noqa: ANN001
+    subscription = text("enabled" if location.enabled_for_subscription else "disabled", language)
     return (
         f"{location.name}\n"
-        f"Coordinates: {location.latitude:.4f}, {location.longitude:.4f}\n"
-        f"Source: {_format_source(location.source)}\n"
-        f"Alerts: {subscription}"
+        f"{text('coordinates', language)}: {location.latitude:.4f}, {location.longitude:.4f}\n"
+        f"{text('source', language)}: {_format_source(location.source, language)}\n"
+        f"{text('alerts', language)}: {subscription}"
     )
 
 
-def _format_source(source: LocationSource) -> str:
+def _format_source(source: LocationSource, language: str = DEFAULT_LANGUAGE) -> str:
     return {
-        LocationSource.CITY: "city",
-        LocationSource.COORDINATES: "coordinates",
-        LocationSource.TELEGRAM_GEO: "Telegram location",
+        LocationSource.CITY: text("source_city", language),
+        LocationSource.COORDINATES: text("source_coordinates", language),
+        LocationSource.TELEGRAM_GEO: text("source_telegram_geo", language),
     }[source]

@@ -1,9 +1,12 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from bot.db.connection import connect
 from bot.db.migrations import migrate
+from bot.domain.enums import ObservingProfile
+from bot.domain.models import User
 from bot.handlers.locations import (
     AddLocationStates,
     add_location_coordinates_message,
@@ -147,6 +150,44 @@ async def test_add_location_coordinates_message_stores_location(tmp_path: Path) 
     assert saved_locations[0].name == "Поле у реки"
     assert state.cleared is True
     assert message.answers == ["Enter the location name."]
+
+
+@pytest.mark.asyncio
+async def test_add_location_keeps_existing_user_language(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
+    users.upsert(
+        User(
+            telegram_id=100,
+            timezone="UTC",
+            language="ru",
+            forecast_days=3,
+            observing_profile=ObservingProfile.DEEP_SKY,
+            score_threshold=60,
+            created_at=datetime.now(tz=UTC),
+        )
+    )
+    state = FakeState()
+
+    await add_location_input_message(
+        FakeMessage(user_id=100, text="45.0448, 38.976"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+        geocoding=FakeGeocoding([]),  # type: ignore[arg-type]
+    )
+    result_message = FakeMessage(user_id=100, text="Поле")
+    await add_location_name_message(
+        result_message,
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+    )
+
+    assert users.get(100).language == "ru"
+    labels = [button.text for row in result_message.reply_markups[-1].keyboard for button in row]
+    assert "🔭 Прогноз" in labels
 
 
 @pytest.mark.asyncio

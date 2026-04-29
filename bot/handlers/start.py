@@ -3,12 +3,14 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message
 
 from bot.keyboards.menu import main_menu_keyboard
+from bot.texts.i18n import DEFAULT_LANGUAGE, text
 
 router = Router()
-
-MENU_TEXT = "Hi! I will help you choose the best time for an astronomy trip."
 
 
 @router.message(CommandStart())
 async def start_command(message: Message) -> None:
-    await message.answer(MENU_TEXT, reply_markup=main_menu_keyboard())
+    await message.answer(
+        text("start_text", DEFAULT_LANGUAGE),
+        reply_markup=main_menu_keyboard(DEFAULT_LANGUAGE),
+    )

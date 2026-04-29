@@ -9,12 +9,14 @@ from aiogram.types import CallbackQuery, Message
 
 from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.domain.models import Subscription, User
+from bot.keyboards.menu import main_menu_keyboard
 from bot.keyboards.settings import settings_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
 from bot.texts.i18n import DEFAULT_LANGUAGE, normalize_language, text
 
 router = Router()
+
 
 class SettingsStates(StatesGroup):
     waiting_for_send_time = State()
@@ -71,6 +73,7 @@ async def update_language_callback(
         subscriptions,
         text("language_updated", language),
         language,
+        refresh_main_menu=True,
     )
 
 
@@ -287,6 +290,7 @@ async def _send_updated_settings(
     subscriptions: SubscriptionRepository,
     message: str,
     language: str,
+    refresh_main_menu: bool = False,
 ) -> None:
     if callback.message:
         settings_text = _format_settings(callback.from_user.id, users, subscriptions, language)
@@ -294,6 +298,11 @@ async def _send_updated_settings(
             f"{message}\n\n{settings_text}",
             reply_markup=settings_keyboard(language),
         )
+        if refresh_main_menu:
+            await callback.message.answer(
+                text("main_menu", language),
+                reply_markup=main_menu_keyboard(language),
+            )
     await callback.answer()
 
 

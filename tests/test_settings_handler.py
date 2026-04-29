@@ -101,6 +101,24 @@ async def test_update_language_saves_selected_language(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_language_refreshes_main_menu_keyboard(tmp_path: Path) -> None:
+    users, subscriptions = _repositories(tmp_path)
+    callback = FakeCallback(100, "settings:language:ru", FakeMessage(100))
+
+    await update_language_callback(
+        callback,
+        users=users,
+        subscriptions=subscriptions,
+        connection=users.connection,
+    )  # type: ignore[arg-type]
+
+    _, keyboard = callback.message.answers[-1]
+    labels = [button.text for row in keyboard.keyboard for button in row]
+    assert "🔭 Прогноз" in labels
+    assert "⚙️ Настройки" in labels
+
+
+@pytest.mark.asyncio
 async def test_update_forecast_days_saves_user_and_subscription(tmp_path: Path) -> None:
     users, subscriptions = _repositories(tmp_path)
     callback = FakeCallback(100, "settings:days:5", FakeMessage(100))

@@ -11,25 +11,31 @@ from bot.keyboards.menu import main_menu_keyboard
 from bot.keyboards.subscription import subscription_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
-from bot.texts.i18n import DEFAULT_LANGUAGE
+from bot.texts.i18n import DEFAULT_LANGUAGE, normalize_language, text
 
 router = Router()
-
-SUBSCRIPTION_TEXT = (
-    "Astronomy forecast alerts. You can enable a daily digest or disable sending."
-)
 
 
 @router.message(Command("subscribe"))
 @router.message(F.text == "📬 Рассылка")
-async def subscribe_command(message: Message) -> None:
-    await message.answer(SUBSCRIPTION_TEXT, reply_markup=subscription_keyboard())
+@router.message(F.text == "📬 Alerts")
+async def subscribe_command(message: Message, users: UserRepository | None = None) -> None:
+    language = _language_for_message(message, users)
+    await message.answer(
+        text("subscription_text", language), reply_markup=subscription_keyboard(language)
+    )
 
 
 @router.callback_query(F.data == "subscription:open")
-async def subscription_callback(callback: CallbackQuery) -> None:
+async def subscription_callback(
+    callback: CallbackQuery, users: UserRepository | None = None
+) -> None:
+    language = _language_for_user(callback.from_user.id, users)
     if callback.message:
-        await callback.message.answer(SUBSCRIPTION_TEXT, reply_markup=subscription_keyboard())
+        await callback.message.answer(
+            text("subscription_text", language),
+            reply_markup=subscription_keyboard(language),
+        )
     await callback.answer()
 
 
@@ -40,7 +46,8 @@ async def enable_subscription_callback(
     subscriptions: SubscriptionRepository,
     connection: sqlite3.Connection,
 ) -> None:
-    _ensure_user(callback.from_user.id, users)
+    user = _ensure_user(callback.from_user.id, users)
+    language = normalize_language(user.language)
     now = datetime.now(tz=UTC)
     current = subscriptions.get(callback.from_user.id)
     subscriptions.upsert(
@@ -58,8 +65,8 @@ async def enable_subscription_callback(
     connection.commit()
     if callback.message:
         await callback.message.answer(
-            "Alerts enabled. By default, I send a daily digest at 20:00 UTC.",
-            reply_markup=main_menu_keyboard(),
+            text("subscription_enabled_message", language),
+            reply_markup=main_menu_keyboard(language),
         )
     await callback.answer()
 
@@ -71,7 +78,8 @@ async def disable_subscription_callback(
     subscriptions: SubscriptionRepository,
     connection: sqlite3.Connection,
 ) -> None:
-    _ensure_user(callback.from_user.id, users)
+    user = _ensure_user(callback.from_user.id, users)
+    language = normalize_language(user.language)
     now = datetime.now(tz=UTC)
     current = subscriptions.get(callback.from_user.id)
     subscriptions.upsert(
@@ -88,22 +96,41 @@ async def disable_subscription_callback(
     )
     connection.commit()
     if callback.message:
-        await callback.message.answer("Alerts disabled.", reply_markup=main_menu_keyboard())
+        await callback.message.answer(
+            text("subscription_disabled_message", language),
+            reply_markup=main_menu_keyboard(language),
+        )
     await callback.answer()
 
 
-def _ensure_user(user_id: int, users: UserRepository) -> None:
-    if users.get(user_id) is not None:
-        return
+def _ensure_user(user_id: int, users: UserRepository) -> User:
+    user = users.get(user_id)
+    if user is not None:
+        return user
 
-    users.upsert(
-        User(
-            telegram_id=user_id,
-            timezone="UTC",
-            language=DEFAULT_LANGUAGE,
-            forecast_days=3,
-            observing_profile=ObservingProfile.DEEP_SKY,
-            score_threshold=60,
-            created_at=datetime.now(tz=UTC),
-        )
+    user = User(
+        telegram_id=user_id,
+        timezone="UTC",
+        language=DEFAULT_LANGUAGE,
+        forecast_days=3,
+        observing_profile=ObservingProfile.DEEP_SKY,
+        score_threshold=60,
+        created_at=datetime.now(tz=UTC),
     )
+    users.upsert(user)
+    return user
+
+
+def _language_for_message(message: Message, users: UserRepository | None) -> str:
+    if message.from_user is None:
+        return DEFAULT_LANGUAGE
+    return _language_for_user(message.from_user.id, users)
+
+
+def _language_for_user(user_id: int, users: UserRepository | None) -> str:
+    if users is None:
+        return DEFAULT_LANGUAGE
+    user = users.get(user_id)
+    if user is None:
+        return DEFAULT_LANGUAGE
+    return normalize_language(user.language)
