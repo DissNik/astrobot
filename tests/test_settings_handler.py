@@ -100,11 +100,11 @@ async def test_settings_command_shows_edit_buttons(tmp_path: Path) -> None:
     text, keyboard = message.answers[0]
     labels = [button.text for row in keyboard.inline_keyboard for button in row]
     assert "⚙️ Profile and subscription settings" in text
-    assert "3 nights" in labels
+    assert "✅ 3 nights" in labels
     assert "5 nights" in labels
-    assert "Deep-sky" in labels
+    assert "✅ Deep-sky" in labels
     assert "Good conditions only" in labels
-    assert "English" in labels
+    assert "✅ English" in labels
     assert "Русский" in labels
     assert "Notification time" in labels
 
@@ -178,6 +178,7 @@ async def test_update_forecast_days_edits_settings_message_with_visual_summary(
 
     text, keyboard = callback.message.edits[0]
     assert callback.message.answers == []
+    labels = [button.text for row in keyboard.inline_keyboard for button in row]
     assert text == (
         "⚙️ Profile and subscription settings\n\n"
         "🌙 Forecast: 5 nights\n"
@@ -188,6 +189,8 @@ async def test_update_forecast_days_edits_settings_message_with_visual_summary(
         "⭐ Threshold: 60/100"
     )
     assert keyboard.inline_keyboard[0][0].callback_data == "settings:days:3"
+    assert "✅ 5 nights" in labels
+    assert "3 nights" in labels
 
 
 @pytest.mark.asyncio

@@ -6,7 +6,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.domain.models import Subscription, User
@@ -35,7 +35,7 @@ async def settings_command(
     language = _language_for_user(user_id, users)
     await message.answer(
         _format_settings(user_id, users, subscriptions, language),
-        reply_markup=settings_keyboard(language),
+        reply_markup=_settings_keyboard_for_user(user_id, users, subscriptions, language),
     )
 
 
@@ -49,7 +49,9 @@ async def settings_callback(
     if callback.message:
         await callback.message.answer(
             _format_settings(callback.from_user.id, users, subscriptions, language),
-            reply_markup=settings_keyboard(language),
+            reply_markup=_settings_keyboard_for_user(
+                callback.from_user.id, users, subscriptions, language
+            ),
         )
     await callback.answer()
 
@@ -223,7 +225,7 @@ async def settings_time_message(
         text("send_time_updated", language)
         + "\n\n"
         + _format_settings(user_id, users, subscriptions, language),
-        reply_markup=settings_keyboard(language),
+        reply_markup=_settings_keyboard_for_user(user_id, users, subscriptions, language),
     )
 
 
@@ -314,7 +316,9 @@ async def _send_updated_settings(
         try:
             await callback.message.edit_text(
                 settings_text,
-                reply_markup=settings_keyboard(language),
+                reply_markup=_settings_keyboard_for_user(
+                    callback.from_user.id, users, subscriptions, language
+                ),
             )
         except TelegramBadRequest as error:
             if "message is not modified" not in str(error):
@@ -326,6 +330,24 @@ async def _send_updated_settings(
             )
             await menu_message.delete()
     await callback.answer()
+
+
+def _settings_keyboard_for_user(
+    user_id: int | None,
+    users: UserRepository,
+    subscriptions: SubscriptionRepository,
+    language: str,
+) -> InlineKeyboardMarkup:
+    user = users.get(user_id) if user_id is not None else None
+    subscription = subscriptions.get(user_id) if user_id is not None else None
+    return settings_keyboard(
+        language,
+        selected_language=user.language if user else language,
+        forecast_days=user.forecast_days if user else 3,
+        observing_profile=user.observing_profile if user else ObservingProfile.DEEP_SKY,
+        mode=subscription.mode if subscription else SubscriptionMode.DAILY_DIGEST,
+        score_threshold=subscription.score_threshold if subscription else 60,
+    )
 
 
 def _ensure_user(user_id: int, users: UserRepository) -> User:

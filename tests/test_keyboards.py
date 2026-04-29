@@ -1,3 +1,4 @@
+from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.keyboards.locations import locations_keyboard
 from bot.keyboards.menu import main_menu_keyboard
 from bot.keyboards.settings import settings_keyboard
@@ -47,3 +48,28 @@ def test_settings_keyboard_uses_wide_rows_for_long_russian_labels() -> None:
     assert ["settings:mode:good_conditions_only"] in rows
     assert ["settings:threshold:50", "settings:threshold:60"] in rows
     assert ["settings:threshold:70", "settings:threshold:80"] in rows
+
+
+def test_settings_keyboard_marks_selected_values() -> None:
+    keyboard = settings_keyboard(
+        "ru",
+        selected_language="ru",
+        forecast_days=5,
+        observing_profile=ObservingProfile.PLANETARY_LUNAR,
+        mode=SubscriptionMode.GOOD_CONDITIONS_ONLY,
+        score_threshold=70,
+    )
+    labels_by_callback = {
+        button.callback_data: button.text
+        for row in keyboard.inline_keyboard
+        for button in row
+    }
+
+    assert labels_by_callback["settings:days:5"] == "✅ 5 ночей"
+    assert labels_by_callback["settings:language:ru"] == "✅ Русский"
+    assert labels_by_callback["settings:profile:planetary_lunar"] == "✅ Планеты/Луна"
+    assert labels_by_callback["settings:mode:good_conditions_only"] == (
+        "✅ Только хорошие условия"
+    )
+    assert labels_by_callback["settings:threshold:70"] == "✅ Порог 70"
+    assert labels_by_callback["settings:days:3"] == "3 ночи"
