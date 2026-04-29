@@ -9,13 +9,13 @@ from bot.db.migrations import migrate
 from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.domain.models import Subscription, User
 from bot.handlers.subscription import (
-    _last_sent_on_for_enabled_subscription,
     disable_subscription_callback,
     enable_subscription_callback,
     subscription_callback,
 )
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
+from bot.services.subscription_service import last_sent_on_for_enabled_subscription
 
 
 class FakeUser:
@@ -152,7 +152,7 @@ def test_enable_subscription_after_configured_time_skips_current_local_day() -> 
         updated_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
     )
 
-    last_sent_on = _last_sent_on_for_enabled_subscription(
+    last_sent_on = last_sent_on_for_enabled_subscription(
         subscription,
         user,
         now_utc=datetime(2026, 4, 26, 12, 0, tzinfo=ZoneInfo("UTC")),
@@ -182,7 +182,7 @@ def test_enable_subscription_before_configured_time_keeps_subscription_due_today
         updated_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
     )
 
-    last_sent_on = _last_sent_on_for_enabled_subscription(
+    last_sent_on = last_sent_on_for_enabled_subscription(
         subscription,
         user,
         now_utc=datetime(2026, 4, 26, 9, 0, tzinfo=ZoneInfo("UTC")),

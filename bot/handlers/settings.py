@@ -3,7 +3,6 @@ from datetime import UTC, datetime, time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from aiogram import F, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -11,10 +10,13 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.domain.models import Subscription, User
+from bot.handlers.common import edit_callback_message, language_for_user, message_user_id
 from bot.keyboards.menu import main_menu_keyboard
 from bot.keyboards.settings import settings_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
+from bot.services.subscription_service import build_default_subscription
+from bot.services.user_service import build_default_user
 from bot.texts.i18n import DEFAULT_LANGUAGE, normalize_language, text
 
 router = Router()
@@ -32,8 +34,8 @@ async def settings_command(
     users: UserRepository,
     subscriptions: SubscriptionRepository,
 ) -> None:
-    user_id = _message_user_id(message)
-    language = _language_for_user(user_id, users)
+    user_id = message_user_id(message)
+    language = language_for_user(user_id, users)
     await message.answer(
         _format_settings(user_id, users, subscriptions, language),
         reply_markup=_settings_keyboard_for_user(user_id, users, subscriptions, language),
@@ -46,7 +48,7 @@ async def settings_callback(
     users: UserRepository,
     subscriptions: SubscriptionRepository,
 ) -> None:
-    language = _language_for_user(callback.from_user.id, users)
+    language = language_for_user(callback.from_user.id, users)
     if callback.message:
         await callback.message.answer(
             _format_settings(callback.from_user.id, users, subscriptions, language),
@@ -191,7 +193,7 @@ async def settings_time_callback(
     users: UserRepository,
 ) -> None:
     await state.set_state(SettingsStates.waiting_for_send_time)
-    language = _language_for_user(callback.from_user.id, users)
+    language = language_for_user(callback.from_user.id, users)
     if callback.message:
         await callback.message.answer(
             text("enter_send_time", language),
@@ -208,8 +210,8 @@ async def settings_time_message(
     subscriptions: SubscriptionRepository,
     connection: sqlite3.Connection,
 ) -> None:
-    user_id = _message_user_id(message)
-    language = _language_for_user(user_id, users)
+    user_id = message_user_id(message)
+    language = language_for_user(user_id, users)
     if user_id is None:
         await message.answer(text("invalid_send_time", language))
         return
@@ -270,12 +272,6 @@ def _format_settings(
     )
 
 
-def _message_user_id(message: Message) -> int | None:
-    if message.from_user is None:
-        return None
-    return message.from_user.id
-
-
 def _format_profile(profile: ObservingProfile, language: str) -> str:
     return {
         ObservingProfile.DEEP_SKY: text("settings_profile_deep_sky", language),
@@ -321,16 +317,13 @@ async def _send_updated_settings(
 ) -> None:
     if callback.message:
         settings_text = _format_settings(callback.from_user.id, users, subscriptions, language)
-        try:
-            await callback.message.edit_text(
-                settings_text,
-                reply_markup=_settings_keyboard_for_user(
-                    callback.from_user.id, users, subscriptions, language
-                ),
-            )
-        except TelegramBadRequest as error:
-            if "message is not modified" not in str(error):
-                raise
+        await edit_callback_message(
+            callback.message,
+            settings_text,
+            reply_markup=_settings_keyboard_for_user(
+                callback.from_user.id, users, subscriptions, language
+            ),
+        )
         if refresh_main_menu:
             await callback.message.answer(
                 text(f"language_set_{language}", language),
@@ -362,15 +355,7 @@ def _ensure_user(user_id: int, users: UserRepository) -> User:
     if user is not None:
         return user
 
-    return User(
-        telegram_id=user_id,
-        timezone="UTC",
-        language=DEFAULT_LANGUAGE,
-        forecast_days=3,
-        observing_profile=ObservingProfile.DEEP_SKY,
-        score_threshold=60,
-        created_at=datetime.now(tz=UTC),
-    )
+    return build_default_user(user_id)
 
 
 def _ensure_subscription(user: User, subscriptions: SubscriptionRepository) -> Subscription:
@@ -378,16 +363,7 @@ def _ensure_subscription(user: User, subscriptions: SubscriptionRepository) -> S
     if subscription is not None:
         return subscription
 
-    return Subscription(
-        user_id=user.telegram_id,
-        enabled=False,
-        mode=SubscriptionMode.DAILY_DIGEST,
-        send_time_local=time(20, 0),
-        forecast_days=user.forecast_days,
-        observing_profile=user.observing_profile,
-        score_threshold=user.score_threshold,
-        updated_at=datetime.now(tz=UTC),
-    )
+    return build_default_subscription(user)
 
 
 def _replace_user_settings(
@@ -492,12 +468,3 @@ def _parse_time_and_timezone(text_value: str | None) -> tuple[time, str | None] 
         return None
 
     return parsed_time, timezone
-
-
-def _language_for_user(user_id: int | None, users: UserRepository) -> str:
-    if user_id is None:
-        return DEFAULT_LANGUAGE
-    user = users.get(user_id)
-    if user is None:
-        return DEFAULT_LANGUAGE
-    return normalize_language(user.language)

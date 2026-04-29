@@ -1,11 +1,16 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from bot.domain.enums import LocationSource, SkyPreset, SubscriptionMode
-from bot.domain.models import Location, LocationForecast, NightForecast
-from bot.services.subscription_service import select_reports_for_subscription
+from bot.domain.enums import LocationSource, ObservingProfile, SkyPreset, SubscriptionMode
+from bot.domain.models import Location, LocationForecast, NightForecast, Subscription, User
+from bot.services.subscription_service import (
+    disable_subscription,
+    enable_subscription,
+    last_sent_on_for_enabled_subscription,
+    select_reports_for_subscription,
+)
 
 
 def _location(name: str) -> Location:
@@ -112,3 +117,106 @@ def test_select_reports_for_subscription_rejects_invalid_threshold(threshold: in
             mode=SubscriptionMode.DAILY_DIGEST,
             threshold=threshold,
         )
+
+
+def test_enable_subscription_preserves_existing_settings_after_configured_time() -> None:
+    user = User(
+        telegram_id=100,
+        timezone="Europe/Moscow",
+        language="ru",
+        forecast_days=5,
+        observing_profile=ObservingProfile.PLANETARY_LUNAR,
+        score_threshold=70,
+        created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+    current = Subscription(
+        user_id=100,
+        enabled=False,
+        mode=SubscriptionMode.GOOD_CONDITIONS_ONLY,
+        send_time_local=time(12, 52),
+        forecast_days=5,
+        observing_profile=ObservingProfile.PLANETARY_LUNAR,
+        score_threshold=70,
+        updated_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+
+    subscription = enable_subscription(
+        user,
+        current,
+        now_utc=datetime(2026, 4, 26, 12, 0, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert subscription.enabled is True
+    assert subscription.mode is SubscriptionMode.GOOD_CONDITIONS_ONLY
+    assert subscription.send_time_local == time(12, 52)
+    assert subscription.forecast_days == 5
+    assert subscription.observing_profile is ObservingProfile.PLANETARY_LUNAR
+    assert subscription.score_threshold == 70
+    assert subscription.last_sent_on == date(2026, 4, 26)
+
+
+def test_disable_subscription_preserves_existing_settings() -> None:
+    user = User(
+        telegram_id=100,
+        timezone="UTC",
+        language="en",
+        forecast_days=3,
+        observing_profile=ObservingProfile.DEEP_SKY,
+        score_threshold=60,
+        created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+    current = Subscription(
+        user_id=100,
+        enabled=True,
+        mode=SubscriptionMode.GOOD_CONDITIONS_ONLY,
+        send_time_local=time(9, 3),
+        forecast_days=7,
+        observing_profile=ObservingProfile.PLANETARY_LUNAR,
+        score_threshold=80,
+        updated_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+        last_sent_on=date(2026, 4, 25),
+    )
+
+    subscription = disable_subscription(
+        user,
+        current,
+        now_utc=datetime(2026, 4, 26, 12, 0, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert subscription.enabled is False
+    assert subscription.mode is SubscriptionMode.GOOD_CONDITIONS_ONLY
+    assert subscription.send_time_local == time(9, 3)
+    assert subscription.forecast_days == 7
+    assert subscription.observing_profile is ObservingProfile.PLANETARY_LUNAR
+    assert subscription.score_threshold == 80
+    assert subscription.last_sent_on == date(2026, 4, 25)
+
+
+def test_last_sent_on_for_enabled_subscription_handles_invalid_timezone() -> None:
+    user = User(
+        telegram_id=100,
+        timezone="Invalid/Timezone",
+        language="en",
+        forecast_days=3,
+        observing_profile=ObservingProfile.DEEP_SKY,
+        score_threshold=60,
+        created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+    subscription = Subscription(
+        user_id=100,
+        enabled=False,
+        mode=SubscriptionMode.DAILY_DIGEST,
+        send_time_local=time(11, 0),
+        forecast_days=3,
+        observing_profile=ObservingProfile.DEEP_SKY,
+        score_threshold=60,
+        updated_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+    )
+
+    result = last_sent_on_for_enabled_subscription(
+        subscription,
+        user,
+        now_utc=datetime(2026, 4, 26, 12, 0, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert result == date(2026, 4, 26)

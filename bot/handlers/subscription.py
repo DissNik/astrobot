@@ -1,18 +1,22 @@
 import sqlite3
-from datetime import UTC, date, datetime, time
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from aiogram import F, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from bot.domain.enums import ObservingProfile, SubscriptionMode
+from bot.domain.enums import SubscriptionMode
 from bot.domain.models import Subscription, User
+from bot.handlers.common import edit_callback_message, language_for_message, language_for_user
 from bot.keyboards.subscription import subscription_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
-from bot.texts.i18n import DEFAULT_LANGUAGE, normalize_language, text
+from bot.services.subscription_service import (
+    build_default_subscription,
+    disable_subscription,
+    enable_subscription,
+)
+from bot.services.user_service import build_default_user, ensure_user
+from bot.texts.i18n import normalize_language, text
 
 router = Router()
 
@@ -25,7 +29,7 @@ async def subscribe_command(
     users: UserRepository | None = None,
     subscriptions: SubscriptionRepository | None = None,
 ) -> None:
-    language = _language_for_message(message, users)
+    language = language_for_message(message, users)
     user_id = message.from_user.id if message.from_user else None
     await message.answer(
         _format_subscription_menu(user_id, users, subscriptions),
@@ -39,9 +43,9 @@ async def subscription_callback(
     users: UserRepository | None = None,
     subscriptions: SubscriptionRepository | None = None,
 ) -> None:
-    language = _language_for_user(callback.from_user.id, users)
+    language = language_for_user(callback.from_user.id, users)
     if callback.message:
-        await _edit_callback_message(
+        await edit_callback_message(
             callback.message,
             _format_subscription_menu(callback.from_user.id, users, subscriptions),
             reply_markup=subscription_keyboard(language),
@@ -56,37 +60,13 @@ async def enable_subscription_callback(
     subscriptions: SubscriptionRepository,
     connection: sqlite3.Connection,
 ) -> None:
-    user = _ensure_user(callback.from_user.id, users)
+    user = ensure_user(callback.from_user.id, users)
     language = normalize_language(user.language)
-    now = datetime.now(tz=UTC)
-    current = subscriptions.get(callback.from_user.id)
-    send_time_local = current.send_time_local if current else time(20, 0)
-    base_subscription = Subscription(
-        user_id=callback.from_user.id,
-        enabled=current.enabled if current else False,
-        mode=current.mode if current else SubscriptionMode.DAILY_DIGEST,
-        send_time_local=send_time_local,
-        forecast_days=current.forecast_days if current else 3,
-        observing_profile=current.observing_profile if current else ObservingProfile.DEEP_SKY,
-        score_threshold=current.score_threshold if current else 60,
-        updated_at=now,
-        last_sent_on=current.last_sent_on if current else None,
-    )
-    subscription = Subscription(
-        user_id=callback.from_user.id,
-        enabled=True,
-        mode=base_subscription.mode,
-        send_time_local=base_subscription.send_time_local,
-        forecast_days=base_subscription.forecast_days,
-        observing_profile=base_subscription.observing_profile,
-        score_threshold=base_subscription.score_threshold,
-        updated_at=now,
-        last_sent_on=_last_sent_on_for_enabled_subscription(base_subscription, user, now),
-    )
+    subscription = enable_subscription(user, subscriptions.get(callback.from_user.id))
     subscriptions.upsert(subscription)
     connection.commit()
     if callback.message:
-        await _edit_callback_message(
+        await edit_callback_message(
             callback.message,
             _format_subscription_menu_for_values(subscription, user.timezone, language),
             reply_markup=subscription_keyboard(language),
@@ -101,25 +81,13 @@ async def disable_subscription_callback(
     subscriptions: SubscriptionRepository,
     connection: sqlite3.Connection,
 ) -> None:
-    user = _ensure_user(callback.from_user.id, users)
+    user = ensure_user(callback.from_user.id, users)
     language = normalize_language(user.language)
-    now = datetime.now(tz=UTC)
-    current = subscriptions.get(callback.from_user.id)
-    subscription = Subscription(
-        user_id=callback.from_user.id,
-        enabled=False,
-        mode=current.mode if current else SubscriptionMode.DAILY_DIGEST,
-        send_time_local=current.send_time_local if current else time(20, 0),
-        forecast_days=current.forecast_days if current else 3,
-        observing_profile=current.observing_profile if current else ObservingProfile.DEEP_SKY,
-        score_threshold=current.score_threshold if current else 60,
-        updated_at=now,
-        last_sent_on=current.last_sent_on if current else None,
-    )
+    subscription = disable_subscription(user, subscriptions.get(callback.from_user.id))
     subscriptions.upsert(subscription)
     connection.commit()
     if callback.message:
-        await _edit_callback_message(
+        await edit_callback_message(
             callback.message,
             _format_subscription_menu_for_values(subscription, user.timezone, language),
             reply_markup=subscription_keyboard(language),
@@ -127,52 +95,12 @@ async def disable_subscription_callback(
     await callback.answer()
 
 
-def _ensure_user(user_id: int, users: UserRepository) -> User:
-    user = users.get(user_id)
-    if user is not None:
-        return user
-
-    user = User(
-        telegram_id=user_id,
-        timezone="UTC",
-        language=DEFAULT_LANGUAGE,
-        forecast_days=3,
-        observing_profile=ObservingProfile.DEEP_SKY,
-        score_threshold=60,
-        created_at=datetime.now(tz=UTC),
-    )
-    users.upsert(user)
-    return user
-
-
-def _last_sent_on_for_enabled_subscription(
-    subscription: Subscription,
-    user: User,
-    now_utc: datetime,
-) -> date | None:
-    timezone = _safe_timezone(user.timezone)
-    local_now = now_utc.astimezone(timezone)
-    local_today = local_now.date()
-    if subscription.last_sent_on == local_today:
-        return subscription.last_sent_on
-    if local_now.time().replace(second=0, microsecond=0) >= subscription.send_time_local:
-        return local_today
-    return subscription.last_sent_on
-
-
-def _safe_timezone(timezone: str) -> ZoneInfo:
-    try:
-        return ZoneInfo(timezone)
-    except ZoneInfoNotFoundError:
-        return ZoneInfo("UTC")
-
-
 def _format_subscription_menu(
     user_id: int | None,
     users: UserRepository | None,
     subscriptions: SubscriptionRepository | None,
 ) -> str:
-    language = _language_for_user(user_id, users) if user_id is not None else DEFAULT_LANGUAGE
+    language = language_for_user(user_id, users)
     user = users.get(user_id) if user_id is not None and users is not None else None
     subscription = (
         subscriptions.get(user_id)
@@ -180,18 +108,23 @@ def _format_subscription_menu(
         else None
     )
     timezone = user.timezone if user else "UTC"
-    if subscription is None:
-        subscription = Subscription(
-            user_id=user_id or 0,
-            enabled=False,
-            mode=SubscriptionMode.DAILY_DIGEST,
-            send_time_local=time(20, 0),
-            forecast_days=3,
-            observing_profile=ObservingProfile.DEEP_SKY,
-            score_threshold=60,
-            updated_at=datetime.now(tz=UTC),
-        )
-    return _format_subscription_menu_for_values(subscription, timezone, language)
+    return _format_subscription_menu_for_values(
+        _subscription_for_menu(user_id, user, subscription),
+        timezone,
+        language,
+    )
+
+
+def _subscription_for_menu(
+    user_id: int | None,
+    user: User | None,
+    subscription: Subscription | None,
+) -> Subscription:
+    if subscription is not None:
+        return subscription
+
+    fallback_user = user or build_default_user(user_id or 0)
+    return build_default_subscription(fallback_user)
 
 
 def _format_subscription_menu_for_values(
@@ -236,26 +169,3 @@ def _subscription_label(key: str, language: str) -> str:
         },
     }
     return labels[normalize_language(language)][key]
-
-
-async def _edit_callback_message(message: Message, text_value: str, reply_markup=None) -> None:  # noqa: ANN001
-    try:
-        await message.edit_text(text_value, reply_markup=reply_markup)
-    except TelegramBadRequest as error:
-        if "message is not modified" not in str(error):
-            raise
-
-
-def _language_for_message(message: Message, users: UserRepository | None) -> str:
-    if message.from_user is None:
-        return DEFAULT_LANGUAGE
-    return _language_for_user(message.from_user.id, users)
-
-
-def _language_for_user(user_id: int, users: UserRepository | None) -> str:
-    if users is None:
-        return DEFAULT_LANGUAGE
-    user = users.get(user_id)
-    if user is None:
-        return DEFAULT_LANGUAGE
-    return normalize_language(user.language)
