@@ -2,6 +2,7 @@ from datetime import time
 from pathlib import Path
 
 import pytest
+from aiogram.exceptions import TelegramBadRequest
 
 from bot.db.connection import connect
 from bot.db.migrations import migrate
@@ -26,13 +27,25 @@ class FakeUser:
 
 
 class FakeMessage:
-    def __init__(self, user_id: int, text: str | None = None) -> None:
+    def __init__(
+        self,
+        user_id: int,
+        text: str | None = None,
+        edit_error: TelegramBadRequest | None = None,
+    ) -> None:
         self.from_user = FakeUser(user_id)
         self.text = text
+        self.edit_error = edit_error
         self.answers: list[tuple[str, object | None]] = []
+        self.edits: list[tuple[str, object | None]] = []
 
     async def answer(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
         self.answers.append((text, reply_markup))
+
+    async def edit_text(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
+        if self.edit_error is not None:
+            raise self.edit_error
+        self.edits.append((text, reply_markup))
 
 
 class FakeCallback:
@@ -74,7 +87,7 @@ async def test_settings_command_shows_edit_buttons(tmp_path: Path) -> None:
 
     text, keyboard = message.answers[0]
     labels = [button.text for row in keyboard.inline_keyboard for button in row]
-    assert "Profile and subscription settings." in text
+    assert "⚙️ Profile and subscription settings" in text
     assert "3 nights" in labels
     assert "5 nights" in labels
     assert "Deep-sky" in labels
@@ -97,7 +110,7 @@ async def test_update_language_saves_selected_language(tmp_path: Path) -> None:
     )  # type: ignore[arg-type]
 
     assert users.get(100).language == "ru"
-    assert "Настройки профиля и рассылки." in callback.message.answers[0][0]
+    assert "⚙️ Настройки профиля и рассылки" in callback.message.edits[0][0]
 
 
 @pytest.mark.asyncio
@@ -132,6 +145,57 @@ async def test_update_forecast_days_saves_user_and_subscription(tmp_path: Path) 
 
     assert users.get(100).forecast_days == 5
     assert subscriptions.get(100).forecast_days == 5
+
+
+@pytest.mark.asyncio
+async def test_update_forecast_days_edits_settings_message_with_visual_summary(
+    tmp_path: Path,
+) -> None:
+    users, subscriptions = _repositories(tmp_path)
+    callback = FakeCallback(100, "settings:days:5", FakeMessage(100))
+
+    await update_forecast_days_callback(
+        callback,
+        users=users,
+        subscriptions=subscriptions,
+        connection=users.connection,
+    )  # type: ignore[arg-type]
+
+    text, keyboard = callback.message.edits[0]
+    assert callback.message.answers == []
+    assert text == (
+        "Forecast horizon updated.\n\n"
+        "⚙️ Profile and subscription settings\n\n"
+        "🌙 Forecast: 5 nights\n"
+        "🔭 Profile: Deep-sky\n"
+        "🔔 Subscription: disabled\n"
+        "🕘 Time: 20:00\n"
+        "📬 Mode: Daily digest\n"
+        "⭐ Threshold: 60/100"
+    )
+    assert keyboard.inline_keyboard[0][0].callback_data == "settings:days:3"
+
+
+@pytest.mark.asyncio
+async def test_update_forecast_days_ignores_unchanged_settings_message(
+    tmp_path: Path,
+) -> None:
+    users, subscriptions = _repositories(tmp_path)
+    message = FakeMessage(
+        100,
+        edit_error=TelegramBadRequest(method=None, message="Bad Request: message is not modified"),
+    )
+    callback = FakeCallback(100, "settings:days:3", message)
+
+    await update_forecast_days_callback(
+        callback,
+        users=users,
+        subscriptions=subscriptions,
+        connection=users.connection,
+    )  # type: ignore[arg-type]
+
+    assert message.answers == []
+    assert callback.answers == [(None, None)]
 
 
 @pytest.mark.asyncio

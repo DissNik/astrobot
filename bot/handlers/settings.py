@@ -2,6 +2,7 @@ import sqlite3
 from datetime import UTC, datetime, time
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -254,13 +255,13 @@ def _format_settings(
 
     subscription_state = text("enabled" if enabled else "disabled", language)
     return (
-        f"{text('settings_title', language)}\n"
-        f"{text('forecast_days', language)}: {forecast_days} {text('nights', language)}\n"
-        f"{text('observing_profile', language)}: {_format_profile(profile, language)}\n"
-        f"{text('subscription', language)}: {subscription_state}\n"
-        f"{text('send_time', language)}: {send_time}\n"
-        f"{text('subscription_mode', language)}: {_format_mode(mode, language)}\n"
-        f"{text('threshold', language)}: {threshold}/100"
+        f"⚙️ {text('settings_title', language).rstrip('.')}\n\n"
+        f"🌙 {_settings_label('forecast', language)}: {forecast_days} {text('nights', language)}\n"
+        f"🔭 {_settings_label('profile', language)}: {_format_profile(profile, language)}\n"
+        f"🔔 {_settings_label('subscription', language)}: {subscription_state}\n"
+        f"🕘 {_settings_label('time', language)}: {send_time}\n"
+        f"📬 {_settings_label('mode', language)}: {_format_mode(mode, language)}\n"
+        f"⭐ {_settings_label('threshold', language)}: {threshold}/100"
     )
 
 
@@ -272,16 +273,38 @@ def _message_user_id(message: Message) -> int | None:
 
 def _format_profile(profile: ObservingProfile, language: str) -> str:
     return {
-        ObservingProfile.DEEP_SKY: text("deep_sky", language),
-        ObservingProfile.PLANETARY_LUNAR: text("planetary_lunar", language),
+        ObservingProfile.DEEP_SKY: text("settings_profile_deep_sky", language),
+        ObservingProfile.PLANETARY_LUNAR: text("settings_profile_planetary_lunar", language),
     }[profile]
 
 
 def _format_mode(mode: SubscriptionMode, language: str) -> str:
     return {
-        SubscriptionMode.DAILY_DIGEST: text("daily_digest", language),
-        SubscriptionMode.GOOD_CONDITIONS_ONLY: text("good_conditions_only", language),
+        SubscriptionMode.DAILY_DIGEST: text("settings_daily_digest", language),
+        SubscriptionMode.GOOD_CONDITIONS_ONLY: text("settings_good_conditions_only", language),
     }[mode]
+
+
+def _settings_label(key: str, language: str) -> str:
+    labels = {
+        "en": {
+            "forecast": "Forecast",
+            "profile": "Profile",
+            "subscription": "Subscription",
+            "time": "Time",
+            "mode": "Mode",
+            "threshold": "Threshold",
+        },
+        "ru": {
+            "forecast": "Прогноз",
+            "profile": "Профиль",
+            "subscription": "Рассылка",
+            "time": "Время",
+            "mode": "Режим",
+            "threshold": "Порог",
+        },
+    }
+    return labels[normalize_language(language)][key]
 
 
 async def _send_updated_settings(
@@ -294,10 +317,14 @@ async def _send_updated_settings(
 ) -> None:
     if callback.message:
         settings_text = _format_settings(callback.from_user.id, users, subscriptions, language)
-        await callback.message.answer(
-            f"{message}\n\n{settings_text}",
-            reply_markup=settings_keyboard(language),
-        )
+        try:
+            await callback.message.edit_text(
+                f"{message}\n\n{settings_text}",
+                reply_markup=settings_keyboard(language),
+            )
+        except TelegramBadRequest as error:
+            if "message is not modified" not in str(error):
+                raise
         if refresh_main_menu:
             await callback.message.answer(
                 text("main_menu", language),
