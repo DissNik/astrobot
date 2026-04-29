@@ -50,22 +50,21 @@ async def enable_subscription_callback(
     language = normalize_language(user.language)
     now = datetime.now(tz=UTC)
     current = subscriptions.get(callback.from_user.id)
-    subscriptions.upsert(
-        Subscription(
-            user_id=callback.from_user.id,
-            enabled=True,
-            mode=current.mode if current else SubscriptionMode.DAILY_DIGEST,
-            send_time_local=current.send_time_local if current else time(20, 0),
-            forecast_days=current.forecast_days if current else 3,
-            observing_profile=current.observing_profile if current else ObservingProfile.DEEP_SKY,
-            score_threshold=current.score_threshold if current else 60,
-            updated_at=now,
-        )
+    subscription = Subscription(
+        user_id=callback.from_user.id,
+        enabled=True,
+        mode=current.mode if current else SubscriptionMode.DAILY_DIGEST,
+        send_time_local=current.send_time_local if current else time(20, 0),
+        forecast_days=current.forecast_days if current else 3,
+        observing_profile=current.observing_profile if current else ObservingProfile.DEEP_SKY,
+        score_threshold=current.score_threshold if current else 60,
+        updated_at=now,
     )
+    subscriptions.upsert(subscription)
     connection.commit()
     if callback.message:
         await callback.message.answer(
-            text("subscription_enabled_message", language),
+            _format_subscription_enabled_message(subscription, user.timezone, language),
             reply_markup=main_menu_keyboard(language),
         )
     await callback.answer()
@@ -119,6 +118,18 @@ def _ensure_user(user_id: int, users: UserRepository) -> User:
     )
     users.upsert(user)
     return user
+
+
+def _format_subscription_enabled_message(
+    subscription: Subscription,
+    timezone: str,
+    language: str,
+) -> str:
+    send_time = subscription.send_time_local.isoformat(timespec="minutes")
+    return text("subscription_enabled_message", language).format(
+        send_time=send_time,
+        timezone=timezone,
+    )
 
 
 def _language_for_message(message: Message, users: UserRepository | None) -> str:

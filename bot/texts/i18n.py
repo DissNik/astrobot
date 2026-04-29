@@ -102,7 +102,7 @@ TEXTS = {
             "Astronomy forecast alerts. You can enable a daily digest or disable sending."
         ),
         "subscription_enabled_message": (
-            "Alerts enabled. By default, I send a daily digest at 20:00 UTC."
+            "Alerts enabled. I will send a daily digest at {send_time} {timezone}."
         ),
         "subscription_disabled_message": "Alerts disabled.",
     },
@@ -208,7 +208,7 @@ TEXTS = {
             "или отключить отправку."
         ),
         "subscription_enabled_message": (
-            "Рассылка включена. По умолчанию я отправляю ежедневный дайджест в 20:00 UTC."
+            "Рассылка включена. Я отправлю ежедневный дайджест в {send_time} {timezone}."
         ),
         "subscription_disabled_message": "Рассылка отключена.",
     },

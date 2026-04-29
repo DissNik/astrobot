@@ -1,9 +1,13 @@
+from datetime import datetime, time
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from bot.db.connection import connect
 from bot.db.migrations import migrate
+from bot.domain.enums import ObservingProfile, SubscriptionMode
+from bot.domain.models import Subscription, User
 from bot.handlers.subscription import disable_subscription_callback, enable_subscription_callback
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
@@ -57,9 +61,51 @@ async def test_enable_subscription_callback_creates_enabled_subscription(tmp_pat
     assert subscription.enabled is True
     assert subscription.forecast_days == 3
     assert subscription.score_threshold == 60
-    assert message.answers == [
-        "Alerts enabled. By default, I send a daily digest at 20:00 UTC."
-    ]
+    assert message.answers == ["Alerts enabled. I will send a daily digest at 20:00 UTC."]
+
+
+@pytest.mark.asyncio
+async def test_enable_subscription_callback_reports_configured_time_and_timezone(
+    tmp_path: Path,
+) -> None:
+    users, subscriptions = _repositories(tmp_path)
+    now = datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC"))
+    users.upsert(
+        User(
+            telegram_id=100,
+            timezone="UTC",
+            language="ru",
+            forecast_days=3,
+            observing_profile=ObservingProfile.DEEP_SKY,
+            score_threshold=60,
+            created_at=now,
+        )
+    )
+    subscriptions.upsert(
+        Subscription(
+            user_id=100,
+            enabled=False,
+            mode=SubscriptionMode.DAILY_DIGEST,
+            send_time_local=time(9, 3),
+            forecast_days=3,
+            observing_profile=ObservingProfile.DEEP_SKY,
+            score_threshold=60,
+            updated_at=now,
+        )
+    )
+    users.connection.commit()
+    message = FakeMessage(user_id=100)
+    callback = FakeCallback(user_id=100, message=message)
+
+    await enable_subscription_callback(
+        callback,
+        users=users,
+        subscriptions=subscriptions,
+        connection=subscriptions.connection,
+    )  # type: ignore[arg-type]
+
+    assert subscriptions.get(100).send_time_local == time(9, 3)
+    assert message.answers == ["Рассылка включена. Я отправлю ежедневный дайджест в 09:03 UTC."]
 
 
 @pytest.mark.asyncio
