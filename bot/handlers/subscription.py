@@ -2,12 +2,12 @@ import sqlite3
 from datetime import UTC, datetime, time
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.domain.models import Subscription, User
-from bot.keyboards.menu import main_menu_keyboard
 from bot.keyboards.subscription import subscription_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
@@ -19,21 +19,30 @@ router = Router()
 @router.message(Command("subscribe"))
 @router.message(F.text == "📬 Рассылка")
 @router.message(F.text == "📬 Alerts")
-async def subscribe_command(message: Message, users: UserRepository | None = None) -> None:
+async def subscribe_command(
+    message: Message,
+    users: UserRepository | None = None,
+    subscriptions: SubscriptionRepository | None = None,
+) -> None:
     language = _language_for_message(message, users)
+    user_id = message.from_user.id if message.from_user else None
     await message.answer(
-        text("subscription_text", language), reply_markup=subscription_keyboard(language)
+        _format_subscription_menu(user_id, users, subscriptions),
+        reply_markup=subscription_keyboard(language),
     )
 
 
 @router.callback_query(F.data == "subscription:open")
 async def subscription_callback(
-    callback: CallbackQuery, users: UserRepository | None = None
+    callback: CallbackQuery,
+    users: UserRepository | None = None,
+    subscriptions: SubscriptionRepository | None = None,
 ) -> None:
     language = _language_for_user(callback.from_user.id, users)
     if callback.message:
-        await callback.message.answer(
-            text("subscription_text", language),
+        await _edit_callback_message(
+            callback.message,
+            _format_subscription_menu(callback.from_user.id, users, subscriptions),
             reply_markup=subscription_keyboard(language),
         )
     await callback.answer()
@@ -63,9 +72,10 @@ async def enable_subscription_callback(
     subscriptions.upsert(subscription)
     connection.commit()
     if callback.message:
-        await callback.message.answer(
-            _format_subscription_enabled_message(subscription, user.timezone, language),
-            reply_markup=main_menu_keyboard(language),
+        await _edit_callback_message(
+            callback.message,
+            _format_subscription_menu_for_values(subscription, user.timezone, language),
+            reply_markup=subscription_keyboard(language),
         )
     await callback.answer()
 
@@ -81,23 +91,23 @@ async def disable_subscription_callback(
     language = normalize_language(user.language)
     now = datetime.now(tz=UTC)
     current = subscriptions.get(callback.from_user.id)
-    subscriptions.upsert(
-        Subscription(
-            user_id=callback.from_user.id,
-            enabled=False,
-            mode=current.mode if current else SubscriptionMode.DAILY_DIGEST,
-            send_time_local=current.send_time_local if current else time(20, 0),
-            forecast_days=current.forecast_days if current else 3,
-            observing_profile=current.observing_profile if current else ObservingProfile.DEEP_SKY,
-            score_threshold=current.score_threshold if current else 60,
-            updated_at=now,
-        )
+    subscription = Subscription(
+        user_id=callback.from_user.id,
+        enabled=False,
+        mode=current.mode if current else SubscriptionMode.DAILY_DIGEST,
+        send_time_local=current.send_time_local if current else time(20, 0),
+        forecast_days=current.forecast_days if current else 3,
+        observing_profile=current.observing_profile if current else ObservingProfile.DEEP_SKY,
+        score_threshold=current.score_threshold if current else 60,
+        updated_at=now,
     )
+    subscriptions.upsert(subscription)
     connection.commit()
     if callback.message:
-        await callback.message.answer(
-            text("subscription_disabled_message", language),
-            reply_markup=main_menu_keyboard(language),
+        await _edit_callback_message(
+            callback.message,
+            _format_subscription_menu_for_values(subscription, user.timezone, language),
+            reply_markup=subscription_keyboard(language),
         )
     await callback.answer()
 
@@ -120,16 +130,83 @@ def _ensure_user(user_id: int, users: UserRepository) -> User:
     return user
 
 
-def _format_subscription_enabled_message(
+def _format_subscription_menu(
+    user_id: int | None,
+    users: UserRepository | None,
+    subscriptions: SubscriptionRepository | None,
+) -> str:
+    language = _language_for_user(user_id, users) if user_id is not None else DEFAULT_LANGUAGE
+    user = users.get(user_id) if user_id is not None and users is not None else None
+    subscription = (
+        subscriptions.get(user_id)
+        if user_id is not None and subscriptions is not None
+        else None
+    )
+    timezone = user.timezone if user else "UTC"
+    if subscription is None:
+        subscription = Subscription(
+            user_id=user_id or 0,
+            enabled=False,
+            mode=SubscriptionMode.DAILY_DIGEST,
+            send_time_local=time(20, 0),
+            forecast_days=3,
+            observing_profile=ObservingProfile.DEEP_SKY,
+            score_threshold=60,
+            updated_at=datetime.now(tz=UTC),
+        )
+    return _format_subscription_menu_for_values(subscription, timezone, language)
+
+
+def _format_subscription_menu_for_values(
     subscription: Subscription,
     timezone: str,
     language: str,
 ) -> str:
+    language = normalize_language(language)
     send_time = subscription.send_time_local.isoformat(timespec="minutes")
-    return text("subscription_enabled_message", language).format(
-        send_time=send_time,
-        timezone=timezone,
+    subscription_state = text("enabled" if subscription.enabled else "disabled", language)
+    return (
+        f"📬 {_subscription_label('title', language)}\n\n"
+        f"🔔 {_subscription_label('subscription', language)}: {subscription_state}\n"
+        f"🕘 {_subscription_label('time', language)}: {send_time} {timezone}\n"
+        f"📬 {_subscription_label('mode', language)}: {_format_mode(subscription.mode, language)}\n"
+        f"⭐ {_subscription_label('threshold', language)}: {subscription.score_threshold}/100"
     )
+
+
+def _format_mode(mode: SubscriptionMode, language: str) -> str:
+    return {
+        SubscriptionMode.DAILY_DIGEST: text("settings_daily_digest", language),
+        SubscriptionMode.GOOD_CONDITIONS_ONLY: text("settings_good_conditions_only", language),
+    }[mode]
+
+
+def _subscription_label(key: str, language: str) -> str:
+    labels = {
+        "en": {
+            "title": "Alerts",
+            "subscription": "Subscription",
+            "time": "Time",
+            "mode": "Mode",
+            "threshold": "Threshold",
+        },
+        "ru": {
+            "title": "Рассылка",
+            "subscription": "Рассылка",
+            "time": "Время",
+            "mode": "Режим",
+            "threshold": "Порог",
+        },
+    }
+    return labels[normalize_language(language)][key]
+
+
+async def _edit_callback_message(message: Message, text_value: str, reply_markup=None) -> None:  # noqa: ANN001
+    try:
+        await message.edit_text(text_value, reply_markup=reply_markup)
+    except TelegramBadRequest as error:
+        if "message is not modified" not in str(error):
+            raise
 
 
 def _language_for_message(message: Message, users: UserRepository | None) -> str:

@@ -8,7 +8,11 @@ from bot.db.connection import connect
 from bot.db.migrations import migrate
 from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.domain.models import Subscription, User
-from bot.handlers.subscription import disable_subscription_callback, enable_subscription_callback
+from bot.handlers.subscription import (
+    disable_subscription_callback,
+    enable_subscription_callback,
+    subscription_callback,
+)
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
 
@@ -22,9 +26,13 @@ class FakeMessage:
     def __init__(self, user_id: int) -> None:
         self.from_user = FakeUser(user_id)
         self.answers: list[str] = []
+        self.edits: list[tuple[str, object | None]] = []
 
     async def answer(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
         self.answers.append(text)
+
+    async def edit_text(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
+        self.edits.append((text, reply_markup))
 
 
 class FakeCallback:
@@ -61,7 +69,14 @@ async def test_enable_subscription_callback_creates_enabled_subscription(tmp_pat
     assert subscription.enabled is True
     assert subscription.forecast_days == 3
     assert subscription.score_threshold == 60
-    assert message.answers == ["Alerts enabled. I will send a daily digest at 20:00 UTC."]
+    assert message.answers == []
+    assert message.edits[0][0] == (
+        "📬 Alerts\n\n"
+        "🔔 Subscription: enabled\n"
+        "🕘 Time: 20:00 UTC\n"
+        "📬 Mode: Daily digest\n"
+        "⭐ Threshold: 60/100"
+    )
 
 
 @pytest.mark.asyncio
@@ -105,7 +120,33 @@ async def test_enable_subscription_callback_reports_configured_time_and_timezone
     )  # type: ignore[arg-type]
 
     assert subscriptions.get(100).send_time_local == time(9, 3)
-    assert message.answers == ["Рассылка включена. Я отправлю ежедневный дайджест в 09:03 UTC."]
+    assert message.answers == []
+    assert message.edits[0][0] == (
+        "📬 Рассылка\n\n"
+        "🔔 Рассылка: включена\n"
+        "🕘 Время: 09:03 UTC\n"
+        "📬 Режим: Ежедневный дайджест\n"
+        "⭐ Порог: 60/100"
+    )
+
+
+@pytest.mark.asyncio
+async def test_subscription_callback_edits_current_message(tmp_path: Path) -> None:
+    users, subscriptions = _repositories(tmp_path)
+    message = FakeMessage(user_id=100)
+    callback = FakeCallback(user_id=100, message=message)
+
+    await subscription_callback(callback, users=users, subscriptions=subscriptions)  # type: ignore[arg-type]
+
+    assert message.answers == []
+    assert message.edits[0][0] == (
+        "📬 Alerts\n\n"
+        "🔔 Subscription: disabled\n"
+        "🕘 Time: 20:00 UTC\n"
+        "📬 Mode: Daily digest\n"
+        "⭐ Threshold: 60/100"
+    )
+    assert callback.answers == [(None, None)]
 
 
 @pytest.mark.asyncio
@@ -129,3 +170,11 @@ async def test_disable_subscription_callback_disables_existing_subscription(tmp_
     subscription = subscriptions.get(100)
     assert subscription is not None
     assert subscription.enabled is False
+    assert callback.message.answers == []
+    assert callback.message.edits[-1][0] == (
+        "📬 Alerts\n\n"
+        "🔔 Subscription: disabled\n"
+        "🕘 Time: 20:00 UTC\n"
+        "📬 Mode: Daily digest\n"
+        "⭐ Threshold: 60/100"
+    )
