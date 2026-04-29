@@ -301,7 +301,7 @@ async def test_update_subscription_time_saves_subscription_and_timezone(tmp_path
     labels = [button.text for row in keyboard.keyboard for button in row]
     assert prompt_text == (
         "Enter notification time, for example 21:30. You can also add a timezone: "
-        "21:30 Europe/Moscow."
+        "21:30 Europe/Moscow or 21:30 +5."
     )
     assert "🔭 Forecast" in labels
     assert "⚙️ Settings" in labels
@@ -356,4 +356,40 @@ async def test_update_subscription_time_without_timezone_uses_utc_for_new_user(
 
     assert state.cleared is True
     assert users.get(100).timezone == "UTC"
+    assert subscriptions.get(100).send_time_local == time(21, 30)
+
+
+@pytest.mark.asyncio
+async def test_update_subscription_time_accepts_short_utc_offset(tmp_path: Path) -> None:
+    users, subscriptions = _repositories(tmp_path)
+    state = FakeState()
+
+    await settings_time_message(
+        FakeMessage(100, text="21:30 +5"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        subscriptions=subscriptions,
+        connection=users.connection,
+    )
+
+    assert state.cleared is True
+    assert users.get(100).timezone == "UTC+05:00"
+    assert subscriptions.get(100).send_time_local == time(21, 30)
+
+
+@pytest.mark.asyncio
+async def test_update_subscription_time_accepts_prefixed_utc_offset(tmp_path: Path) -> None:
+    users, subscriptions = _repositories(tmp_path)
+    state = FakeState()
+
+    await settings_time_message(
+        FakeMessage(100, text="21:30 UTC+5"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        subscriptions=subscriptions,
+        connection=users.connection,
+    )
+
+    assert state.cleared is True
+    assert users.get(100).timezone == "UTC+05:00"
     assert subscriptions.get(100).send_time_local == time(21, 30)

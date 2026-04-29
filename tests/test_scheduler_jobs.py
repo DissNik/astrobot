@@ -145,6 +145,27 @@ def test_due_subscriptions_uses_user_timezone_and_send_time() -> None:
     assert [subscription.user_id for subscription in due] == [100]
 
 
+def test_due_subscriptions_accepts_fixed_utc_offset_timezone() -> None:
+    subscription = _subscription(SubscriptionMode.DAILY_DIGEST)
+    user = User(
+        100,
+        "UTC+05:00",
+        "ru",
+        3,
+        ObservingProfile.DEEP_SKY,
+        60,
+        datetime.now(tz=ZoneInfo("UTC")),
+    )
+
+    due = due_subscriptions(
+        [subscription],
+        load_user={100: user}.get,
+        now_utc=datetime(2026, 4, 26, 4, 5, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert due == [subscription]
+
+
 def test_due_subscriptions_includes_after_scheduled_time_until_sent_today() -> None:
     subscription = _subscription(SubscriptionMode.DAILY_DIGEST)
     user = User(

@@ -1,6 +1,5 @@
 import sqlite3
 from datetime import UTC, datetime, time
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -16,6 +15,7 @@ from bot.keyboards.settings import settings_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
 from bot.services.subscription_service import build_default_subscription
+from bot.services.timezones import normalize_timezone
 from bot.services.user_service import build_default_user
 from bot.texts.i18n import DEFAULT_LANGUAGE, normalize_language, text
 
@@ -458,13 +458,8 @@ def _parse_time_and_timezone(text_value: str | None) -> tuple[time, str | None] 
     if len(parts) == 1:
         return parsed_time, None
 
-    timezone = parts[1].strip()
-    if not timezone:
-        return None
-
-    try:
-        ZoneInfo(timezone)
-    except ZoneInfoNotFoundError:
+    timezone = normalize_timezone(parts[1])
+    if timezone is None:
         return None
 
     return parsed_time, timezone

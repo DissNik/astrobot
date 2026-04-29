@@ -1,9 +1,9 @@
 from collections.abc import Iterable
 from datetime import UTC, date, datetime, time
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from bot.domain.enums import SubscriptionMode
 from bot.domain.models import LocationForecast, Subscription, User
+from bot.services.timezones import safe_timezone
 
 
 def build_default_subscription(
@@ -70,7 +70,7 @@ def last_sent_on_for_enabled_subscription(
     user: User,
     now_utc: datetime,
 ) -> date | None:
-    timezone = _safe_timezone(user.timezone)
+    timezone = safe_timezone(user.timezone)
     local_now = now_utc.astimezone(timezone)
     local_today = local_now.date()
     if subscription.last_sent_on == local_today:
@@ -107,10 +107,3 @@ def _normalize_mode(mode: SubscriptionMode | str) -> SubscriptionMode:
         return SubscriptionMode(mode)
     except ValueError as error:
         raise ValueError("mode must be a valid SubscriptionMode") from error
-
-
-def _safe_timezone(timezone: str) -> ZoneInfo:
-    try:
-        return ZoneInfo(timezone)
-    except ZoneInfoNotFoundError:
-        return ZoneInfo("UTC")

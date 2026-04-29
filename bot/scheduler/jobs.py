@@ -3,11 +3,11 @@ import logging
 from collections.abc import Awaitable, Callable, Iterable
 from datetime import UTC, date, datetime
 from typing import Protocol
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from bot.domain.models import LocationForecast, Subscription, User
 from bot.services.report_formatter import FORECAST_PARSE_MODE, format_forecast_report
 from bot.services.subscription_service import select_reports_for_subscription
+from bot.services.timezones import safe_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ def due_subscriptions(
 
     for subscription in subscriptions:
         user = load_user(subscription.user_id)
-        timezone = _safe_timezone(user.timezone if user else "UTC")
+        timezone = safe_timezone(user.timezone if user else "UTC")
         local_now = current_utc.astimezone(timezone)
         local_today = local_now.date()
         if subscription.last_sent_on == local_today:
@@ -105,19 +105,12 @@ async def _maybe_await[T](value: T | Awaitable[T]) -> T:
     return value
 
 
-def _safe_timezone(timezone: str) -> ZoneInfo:
-    try:
-        return ZoneInfo(timezone)
-    except ZoneInfoNotFoundError:
-        return ZoneInfo("UTC")
-
-
 def _subscription_local_date(
     subscription: Subscription,
     user: User | None,
     current_utc: datetime,
 ) -> date:
-    timezone = _safe_timezone(user.timezone if user else "UTC")
+    timezone = safe_timezone(user.timezone if user else "UTC")
     return current_utc.astimezone(timezone).date()
 
 
