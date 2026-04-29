@@ -51,6 +51,7 @@ class Subscription:
     observing_profile: ObservingProfile
     score_threshold: int
     updated_at: datetime
+    last_sent_on: date | None = None
 
 
 @dataclass(frozen=True)

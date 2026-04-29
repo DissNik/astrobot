@@ -1,11 +1,13 @@
+from dataclasses import replace
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
+import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from bot.domain.enums import LocationSource, ObservingProfile, SkyPreset, SubscriptionMode
 from bot.domain.models import Location, LocationForecast, NightForecast, Subscription, User
-from bot.scheduler.jobs import build_subscription_message, due_subscriptions
+from bot.scheduler.jobs import build_subscription_message, due_subscriptions, send_due_subscriptions
 from bot.scheduler.runner import create_scheduler
 
 
@@ -141,3 +143,94 @@ def test_due_subscriptions_uses_user_timezone_and_send_time() -> None:
     )
 
     assert [subscription.user_id for subscription in due] == [100]
+
+
+def test_due_subscriptions_includes_after_scheduled_time_until_sent_today() -> None:
+    subscription = _subscription(SubscriptionMode.DAILY_DIGEST)
+    user = User(
+        100,
+        "Asia/Yekaterinburg",
+        "ru",
+        3,
+        ObservingProfile.DEEP_SKY,
+        60,
+        datetime.now(tz=ZoneInfo("UTC")),
+    )
+
+    due = due_subscriptions(
+        [subscription],
+        load_user={100: user}.get,
+        now_utc=datetime(2026, 4, 26, 4, 5, tzinfo=ZoneInfo("UTC")),
+    )
+    already_sent = due_subscriptions(
+        [replace(subscription, last_sent_on=date(2026, 4, 26))],
+        load_user={100: user}.get,
+        now_utc=datetime(2026, 4, 26, 4, 5, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert due == [subscription]
+    assert already_sent == []
+
+
+@pytest.mark.asyncio
+async def test_send_due_subscriptions_marks_successful_send_on_local_date() -> None:
+    subscription = _subscription(SubscriptionMode.DAILY_DIGEST)
+    report = _report("Dark Site", [70])
+    user = User(
+        100,
+        "Asia/Yekaterinburg",
+        "ru",
+        3,
+        ObservingProfile.DEEP_SKY,
+        60,
+        datetime.now(tz=ZoneInfo("UTC")),
+    )
+    sent: list[tuple[int, str]] = []
+    marked: list[tuple[int, date]] = []
+
+    async def send_message(user_id: int, message: str, **_: object) -> None:
+        sent.append((user_id, message))
+
+    await send_due_subscriptions(
+        [subscription],
+        load_reports=lambda _: [report],
+        send_message=send_message,
+        load_user={100: user}.get,
+        mark_sent=lambda item, sent_on: marked.append((item.user_id, sent_on)),
+        now_utc=datetime(2026, 4, 26, 18, 30, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert sent
+    assert marked == [(100, date(2026, 4, 26))]
+
+
+@pytest.mark.asyncio
+async def test_send_due_subscriptions_marks_processed_day_without_matching_conditions() -> None:
+    subscription = _subscription(SubscriptionMode.GOOD_CONDITIONS_ONLY, threshold=80)
+    report = _report("Dark Site", [40])
+    user = User(
+        100,
+        "Asia/Yekaterinburg",
+        "ru",
+        3,
+        ObservingProfile.DEEP_SKY,
+        60,
+        datetime.now(tz=ZoneInfo("UTC")),
+    )
+    sent: list[tuple[int, str]] = []
+    marked: list[tuple[int, date]] = []
+
+    async def send_message(user_id: int, message: str, **_: object) -> None:
+        sent.append((user_id, message))
+
+    await send_due_subscriptions(
+        [subscription],
+        load_reports=lambda _: [report],
+        send_message=send_message,
+        load_user={100: user}.get,
+        mark_sent=lambda item, sent_on: marked.append((item.user_id, sent_on)),
+        now_utc=datetime(2026, 4, 26, 18, 30, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert sent == []
+    assert marked == [(100, date(2026, 4, 26))]

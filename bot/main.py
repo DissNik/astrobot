@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sqlite3
 from dataclasses import dataclass
+from datetime import date
 
 import httpx
 from aiogram import Bot, Dispatcher, Router
@@ -154,6 +155,11 @@ async def _dispatch_due_subscriptions(
         ),
         load_user=repositories.users.get,
         send_message=bot.send_message,
+        mark_sent=lambda subscription, sent_on: _mark_subscription_sent(
+            repositories,
+            subscription.user_id,
+            sent_on,
+        ),
     )
 
 
@@ -176,6 +182,11 @@ async def _load_subscription_reports(
             build_location_forecast(location, provider_forecast, subscription.observing_profile)
         )
     return reports
+
+
+def _mark_subscription_sent(repositories: Repositories, user_id: int, sent_on: date) -> None:
+    repositories.subscriptions.mark_sent(user_id, sent_on)
+    repositories.subscriptions.connection.commit()
 
 
 if __name__ == "__main__":

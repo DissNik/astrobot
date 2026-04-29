@@ -54,4 +54,24 @@ def migrate(connection: sqlite3.Connection) -> None:
         );
         """
     )
+    _add_column_if_missing(
+        connection,
+        table="subscriptions",
+        column="last_sent_on",
+        definition="TEXT",
+    )
     connection.commit()
+
+
+def _add_column_if_missing(
+    connection: sqlite3.Connection,
+    table: str,
+    column: str,
+    definition: str,
+) -> None:
+    columns = {
+        row["name"] if isinstance(row, sqlite3.Row) else row[1]
+        for row in connection.execute(f"PRAGMA table_info({table})")
+    }
+    if column not in columns:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
