@@ -15,9 +15,11 @@ from bot.handlers.locations import (
     delete_location_callback,
     location_manage_callback,
     locations_add_callback,
+    locations_callback,
     locations_list_callback,
     rename_location_callback,
     rename_location_message,
+    toggle_location_subscription_callback,
 )
 from bot.providers.weather_base import GeocodingCandidate
 from bot.repositories.locations import LocationRepository
@@ -46,11 +48,15 @@ class FakeMessage:
         self.text = text
         self.location = location
         self.answers: list[str] = []
+        self.edits: list[tuple[str, object | None]] = []
         self.reply_markups = []
 
     async def answer(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
         self.answers.append(text)
         self.reply_markups.append(reply_markup)
+
+    async def edit_text(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
+        self.edits.append((text, reply_markup))
 
 
 class FakeCallback:
@@ -295,8 +301,89 @@ async def test_locations_list_callback_shows_saved_locations(tmp_path: Path) -> 
 
     await locations_list_callback(callback, locations=locations)  # type: ignore[arg-type]
 
-    assert list_message.answers == ["Your locations:\n1. Поле — 45.0448, 38.9760"]
+    assert list_message.answers == []
+    assert list_message.edits[0][0] == "Your locations:\n1. Поле — 45.0448, 38.9760"
     assert callback.answers == [(None, None)]
+
+
+@pytest.mark.asyncio
+async def test_locations_open_callback_edits_current_message() -> None:
+    message = FakeMessage(user_id=100)
+    callback = FakeCallback(user_id=100, message=message)
+
+    await locations_callback(callback)  # type: ignore[arg-type]
+
+    assert message.answers == []
+    assert message.edits[0][0] == "Observing locations. Manage your saved places here."
+    assert callback.answers == [(None, None)]
+
+
+@pytest.mark.asyncio
+async def test_location_manage_callback_edits_current_message(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
+    state = FakeState()
+    await add_location_input_message(
+        FakeMessage(user_id=100, text="45.0448 38.976"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+        geocoding=FakeGeocoding([]),  # type: ignore[arg-type]
+    )
+    await add_location_name_message(
+        FakeMessage(user_id=100, text="Поле"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+    )
+    location_id = locations.list_for_user(100)[0].id
+    message = FakeMessage(user_id=100)
+    callback = FakeCallback(100, message, data=f"locations:manage:{location_id}")
+
+    await location_manage_callback(callback, locations=locations)  # type: ignore[arg-type]
+
+    assert message.answers == []
+    assert message.edits[0][0] == (
+        "Поле\n"
+        "Coordinates: 45.0448, 38.9760\n"
+        "Source: coordinates\n"
+        "Alerts: enabled"
+    )
+
+
+@pytest.mark.asyncio
+async def test_toggle_location_subscription_edits_location_card(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
+    state = FakeState()
+    await add_location_input_message(
+        FakeMessage(user_id=100, text="45.0448 38.976"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+        geocoding=FakeGeocoding([]),  # type: ignore[arg-type]
+    )
+    await add_location_name_message(
+        FakeMessage(user_id=100, text="Поле"),
+        state,  # type: ignore[arg-type]
+        users=users,
+        locations=locations,
+        connection=locations.connection,
+    )
+    location_id = locations.list_for_user(100)[0].id
+    message = FakeMessage(user_id=100)
+    callback = FakeCallback(100, message, data=f"locations:toggle_subscription:{location_id}")
+
+    await toggle_location_subscription_callback(
+        callback,
+        locations=locations,
+        connection=locations.connection,
+    )  # type: ignore[arg-type]
+
+    assert locations.list_for_user(100)[0].enabled_for_subscription is False
+    assert message.answers == []
+    assert "Alerts: disabled" in message.edits[0][0]
 
 
 @pytest.mark.asyncio
@@ -357,6 +444,8 @@ async def test_location_can_be_deleted(tmp_path: Path) -> None:
     await delete_location_callback(callback, locations=locations, connection=locations.connection)  # type: ignore[arg-type]
 
     assert locations.list_for_user(100) == []
+    assert callback.message.answers == []
+    assert callback.message.edits[0][0] == "You do not have saved locations yet."
 
 
 def test_location_manage_callback_exists_for_saved_location() -> None:

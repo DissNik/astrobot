@@ -2,6 +2,7 @@ import sqlite3
 from datetime import UTC, datetime
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -44,7 +45,8 @@ async def locations_command(message: Message, users: UserRepository | None = Non
 async def locations_callback(callback: CallbackQuery, users: UserRepository | None = None) -> None:
     language = _language_for_user(callback.from_user.id, users)
     if callback.message:
-        await callback.message.answer(
+        await _edit_callback_message(
+            callback.message,
             text("locations_text", language),
             reply_markup=locations_keyboard(language),
         )
@@ -144,7 +146,8 @@ async def locations_list_callback(
     language = _language_for_user(user_id, users)
     saved_locations = locations.list_for_user(user_id)
     if callback.message:
-        await callback.message.answer(
+        await _edit_callback_message(
+            callback.message,
             _format_locations(saved_locations, language),
             reply_markup=locations_list_keyboard(saved_locations),
         )
@@ -165,7 +168,8 @@ async def location_manage_callback(
         return
 
     if callback.message:
-        await callback.message.answer(
+        await _edit_callback_message(
+            callback.message,
             _format_location_details(location, language),
             reply_markup=location_manage_keyboard(location, language),
         )
@@ -235,9 +239,11 @@ async def delete_location_callback(
     locations.delete_for_user(location_id, callback.from_user.id)
     connection.commit()
     if callback.message:
-        await callback.message.answer(
-            text("location_deleted", language),
-            reply_markup=main_menu_keyboard(language),
+        saved_locations = locations.list_for_user(callback.from_user.id)
+        await _edit_callback_message(
+            callback.message,
+            _format_locations(saved_locations, language),
+            reply_markup=locations_list_keyboard(saved_locations),
         )
     await callback.answer()
 
@@ -259,13 +265,14 @@ async def toggle_location_subscription_callback(
     enabled = not location.enabled_for_subscription
     locations.set_subscription_enabled_for_user(location.id, callback.from_user.id, enabled)
     connection.commit()
-    message_text = (
-        text("location_alerts_enabled", language)
-        if enabled
-        else text("location_alerts_disabled", language)
-    )
     if callback.message:
-        await callback.message.answer(message_text, reply_markup=main_menu_keyboard(language))
+        updated_location = locations.get_for_user(location.id, callback.from_user.id)
+        if updated_location is not None:
+            await _edit_callback_message(
+                callback.message,
+                _format_location_details(updated_location, language),
+                reply_markup=location_manage_keyboard(updated_location, language),
+            )
     await callback.answer()
 
 
@@ -429,3 +436,11 @@ def _format_source(source: LocationSource, language: str = DEFAULT_LANGUAGE) -> 
         LocationSource.COORDINATES: text("source_coordinates", language),
         LocationSource.TELEGRAM_GEO: text("source_telegram_geo", language),
     }[source]
+
+
+async def _edit_callback_message(message: Message, text_value: str, reply_markup=None) -> None:  # noqa: ANN001
+    try:
+        await message.edit_text(text_value, reply_markup=reply_markup)
+    except TelegramBadRequest as error:
+        if "message is not modified" not in str(error):
+            raise
