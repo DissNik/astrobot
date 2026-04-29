@@ -7,12 +7,16 @@
 - [ ] Adding Telegram geolocation stores the expected coordinates.
 - [ ] Location can be renamed.
 - [ ] Location can be enabled and disabled for subscription.
+- [ ] Location can be deleted.
 - [ ] `/forecast` returns a 3-night forecast by default.
 - [ ] Forecast horizon can be changed to 5 and 7 nights.
 - [ ] Observing profile can be changed between deep-sky and planetary/lunar.
+- [ ] Language can be changed between English and Russian, and the main menu refreshes.
+- [ ] Notification time accepts `HH:MM`, `HH:MM Europe/Moscow`, and `HH:MM +5`.
 - [ ] Subscription can be enabled and disabled.
 - [ ] Daily digest mode sends a message at the configured local time.
 - [ ] Good-conditions-only mode sends only when a score reaches the threshold.
-- [ ] `/stats` works for `OWNER_TELEGRAM_ID`.
+- [ ] Enabling a subscription after today's configured send time does not send an immediate catch-up message.
+- [ ] `/stats` works for a user listed in `OWNER_TELEGRAM_IDS`.
 - [ ] `/stats` is rejected for non-owner users.
 - [ ] Bot continues running if Open-Meteo returns an error.
