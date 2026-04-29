@@ -17,6 +17,9 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
@@ -24,6 +27,20 @@ jobs:
           printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Create deployment archive
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='.venv' \
+            -czf /tmp/astrobot-deploy.tar.gz .
+
+      - name: Upload deployment archive
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            -P "${{ secrets.SSH_PORT }}" \
+            /tmp/astrobot-deploy.tar.gz \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/tmp/astrobot-deploy.tar.gz"
 
       - name: Deploy over SSH
         run: |
@@ -35,8 +52,14 @@ jobs:
 
           cd /opt/astrobot/app
 
-          git fetch --prune origin main
-          git reset --hard origin/main
+          find . -mindepth 1 -maxdepth 1 \
+            ! -name '.venv' \
+            ! -name '.env' \
+            ! -name 'data' \
+            -exec rm -rf {} +
+
+          tar -xzf /tmp/astrobot-deploy.tar.gz -C /opt/astrobot/app
+          rm /tmp/astrobot-deploy.tar.gz
 
           python3 -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
