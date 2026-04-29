@@ -7,11 +7,19 @@ def test_main_menu_keyboard_contains_core_actions() -> None:
     keyboard = main_menu_keyboard()
     labels = [button.text for row in keyboard.keyboard for button in row]
 
+    assert "🔭 Forecast" in labels
+    assert "📍 Locations" in labels
+    assert "📬 Alerts" in labels
+    assert "⚙️ Settings" in labels
+    assert keyboard.resize_keyboard is True
+
+
+def test_main_menu_keyboard_supports_russian() -> None:
+    keyboard = main_menu_keyboard("ru")
+    labels = [button.text for row in keyboard.keyboard for button in row]
+
     assert "🔭 Прогноз" in labels
     assert "📍 Локации" in labels
-    assert "📬 Рассылка" in labels
-    assert "⚙️ Настройки" in labels
-    assert keyboard.resize_keyboard is True
 
 
 def test_keyboards_emit_known_callback_data() -> None:

@@ -6,7 +6,7 @@ from bot.keyboards.menu import main_menu_keyboard
 
 router = Router()
 
-MENU_TEXT = "Привет! Я помогу выбрать время для астрономической поездки."
+MENU_TEXT = "Hi! I will help you choose the best time for an astronomy trip."
 
 
 @router.message(CommandStart())

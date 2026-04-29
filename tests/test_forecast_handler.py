@@ -89,7 +89,7 @@ def _save_user(users: UserRepository) -> None:
         User(
             telegram_id=100,
             timezone="UTC",
-            language="ru",
+            language="en",
             forecast_days=3,
             observing_profile=ObservingProfile.DEEP_SKY,
             score_threshold=60,
@@ -126,10 +126,10 @@ async def test_forecast_callback_shows_saved_location_buttons(tmp_path: Path) ->
     message = FakeMessage()
     callback = FakeCallback(user_id=100, data="forecast:open", message=message)
 
-    await forecast_callback(callback, locations=locations)  # type: ignore[arg-type]
+    await forecast_callback(callback, locations=locations, users=users)  # type: ignore[arg-type]
 
     text, keyboard, parse_mode = message.answers[0]
-    assert text == "Выберите локацию наблюдения для прогноза."
+    assert text == "Choose an observing location for the forecast."
     assert keyboard.inline_keyboard[0][0].text == "Поле"
     assert keyboard.inline_keyboard[0][0].callback_data == "forecast:location:1"
     assert parse_mode is None
@@ -140,13 +140,13 @@ async def test_forecast_callback_shows_saved_location_buttons(tmp_path: Path) ->
 async def test_forecast_callback_prompts_to_add_location_when_list_is_empty(
     tmp_path: Path,
 ) -> None:
-    _, locations = _repositories(tmp_path)
+    users, locations = _repositories(tmp_path)
     message = FakeMessage()
     callback = FakeCallback(user_id=100, data="forecast:open", message=message)
 
-    await forecast_callback(callback, locations=locations)  # type: ignore[arg-type]
+    await forecast_callback(callback, locations=locations, users=users)  # type: ignore[arg-type]
 
-    assert message.answers[0][0] == "Сначала добавьте локацию наблюдения в разделе «Локации»."
+    assert message.answers[0][0] == "Add an observing location in Locations first."
 
 
 @pytest.mark.asyncio
@@ -168,7 +168,40 @@ async def test_forecast_location_callback_sends_report_for_selected_location(
     )  # type: ignore[arg-type]
 
     assert weather.calls == [(45.0448, 38.976, 4)]
-    assert "Астрономический прогноз" in message.answers[0][0]
+    assert "Astronomical forecast" in message.answers[0][0]
     assert "Поле" in message.answers[0][0]
     assert "2026-04-26" in message.answers[0][0]
     assert message.answers[0][2] == "HTML"
+
+
+@pytest.mark.asyncio
+async def test_forecast_location_callback_uses_selected_russian_language(
+    tmp_path: Path,
+) -> None:
+    users, locations = _repositories(tmp_path)
+    _save_user(users)
+    users.upsert(
+        User(
+            telegram_id=100,
+            timezone="UTC",
+            language="ru",
+            forecast_days=3,
+            observing_profile=ObservingProfile.DEEP_SKY,
+            score_threshold=60,
+            created_at=datetime(2026, 4, 26, tzinfo=ZoneInfo("UTC")),
+        )
+    )
+    users.connection.commit()
+    _save_location(locations)
+    message = FakeMessage()
+    callback = FakeCallback(user_id=100, data="forecast:location:1", message=message)
+
+    await forecast_location_callback(
+        callback,
+        users=users,
+        locations=locations,
+        weather=FakeWeather(),
+    )  # type: ignore[arg-type]
+
+    assert "Астрономический прогноз" in message.answers[0][0]
+    assert "можно ехать" in message.answers[0][0]

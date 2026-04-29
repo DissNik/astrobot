@@ -11,6 +11,7 @@ from bot.handlers.settings import (
     settings_time_callback,
     settings_time_message,
     update_forecast_days_callback,
+    update_language_callback,
     update_profile_callback,
     update_subscription_mode_callback,
     update_threshold_callback,
@@ -73,12 +74,30 @@ async def test_settings_command_shows_edit_buttons(tmp_path: Path) -> None:
 
     text, keyboard = message.answers[0]
     labels = [button.text for row in keyboard.inline_keyboard for button in row]
-    assert "Настройки профиля и рассылки." in text
-    assert "3 ночи" in labels
-    assert "5 ночей" in labels
+    assert "Profile and subscription settings." in text
+    assert "3 nights" in labels
+    assert "5 nights" in labels
     assert "Deep-sky" in labels
-    assert "Только хорошие условия" in labels
-    assert "Время рассылки" in labels
+    assert "Good conditions only" in labels
+    assert "English" in labels
+    assert "Русский" in labels
+    assert "Notification time" in labels
+
+
+@pytest.mark.asyncio
+async def test_update_language_saves_selected_language(tmp_path: Path) -> None:
+    users, subscriptions = _repositories(tmp_path)
+    callback = FakeCallback(100, "settings:language:ru", FakeMessage(100))
+
+    await update_language_callback(
+        callback,
+        users=users,
+        subscriptions=subscriptions,
+        connection=users.connection,
+    )  # type: ignore[arg-type]
+
+    assert users.get(100).language == "ru"
+    assert "Настройки профиля и рассылки." in callback.message.answers[0][0]
 
 
 @pytest.mark.asyncio
@@ -150,7 +169,7 @@ async def test_update_subscription_time_saves_subscription(tmp_path: Path) -> No
     state = FakeState()
     callback = FakeCallback(100, "settings:time", FakeMessage(100))
 
-    await settings_time_callback(callback, state)  # type: ignore[arg-type]
+    await settings_time_callback(callback, state, users=users)  # type: ignore[arg-type]
     await settings_time_message(
         FakeMessage(100, text="21:30"),
         state,  # type: ignore[arg-type]
@@ -161,4 +180,4 @@ async def test_update_subscription_time_saves_subscription(tmp_path: Path) -> No
 
     assert state.cleared is True
     assert subscriptions.get(100).send_time_local == time(21, 30)
-    assert callback.message.answers == [("Введите время рассылки в формате HH:MM.", None)]
+    assert callback.message.answers == [("Enter notification time in HH:MM format.", None)]

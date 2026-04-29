@@ -27,10 +27,10 @@ def _format_stats_summary(summary: Any) -> str:
 
     return "\n".join(
         [
-            "Статистика бота:",
-            f"Пользователи: {summary.get('users', 0)}",
-            f"Локации: {summary.get('locations', 0)}",
-            f"Активные подписки: {summary.get('active_subscriptions', 0)}",
+            "Bot statistics:",
+            f"Users: {summary.get('users', 0)}",
+            f"Locations: {summary.get('locations', 0)}",
+            f"Active subscriptions: {summary.get('active_subscriptions', 0)}",
         ]
     )
 
@@ -43,7 +43,7 @@ async def stats_command(
 ) -> None:
     user_id = message.from_user.id if message.from_user else None
     if not is_owner(user_id=user_id, owner_ids=owner_telegram_ids):
-        await message.answer("Команда доступна только владельцу бота.")
+        await message.answer("This command is available only to bot owners.")
         return
 
     await message.answer(await _resolve_stats_text(stats))

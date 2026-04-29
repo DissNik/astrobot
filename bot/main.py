@@ -152,6 +152,7 @@ async def _dispatch_due_subscriptions(
             repositories,
             weather,
         ),
+        load_user=repositories.users.get,
         send_message=bot.send_message,
     )
 

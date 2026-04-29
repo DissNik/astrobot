@@ -11,11 +11,12 @@ from bot.keyboards.menu import main_menu_keyboard
 from bot.keyboards.subscription import subscription_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
+from bot.texts.i18n import DEFAULT_LANGUAGE
 
 router = Router()
 
 SUBSCRIPTION_TEXT = (
-    "Рассылка астропрогноза. Можно включить ежедневный дайджест или отключить отправку."
+    "Astronomy forecast alerts. You can enable a daily digest or disable sending."
 )
 
 
@@ -57,7 +58,7 @@ async def enable_subscription_callback(
     connection.commit()
     if callback.message:
         await callback.message.answer(
-            "Рассылка включена. По умолчанию отправляю ежедневный дайджест в 20:00 UTC.",
+            "Alerts enabled. By default, I send a daily digest at 20:00 UTC.",
             reply_markup=main_menu_keyboard(),
         )
     await callback.answer()
@@ -87,7 +88,7 @@ async def disable_subscription_callback(
     )
     connection.commit()
     if callback.message:
-        await callback.message.answer("Рассылка отключена.", reply_markup=main_menu_keyboard())
+        await callback.message.answer("Alerts disabled.", reply_markup=main_menu_keyboard())
     await callback.answer()
 
 
@@ -99,7 +100,7 @@ def _ensure_user(user_id: int, users: UserRepository) -> None:
         User(
             telegram_id=user_id,
             timezone="UTC",
-            language="ru",
+            language=DEFAULT_LANGUAGE,
             forecast_days=3,
             observing_profile=ObservingProfile.DEEP_SKY,
             score_threshold=60,

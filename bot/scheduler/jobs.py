@@ -20,13 +20,14 @@ ReportsLoader = Callable[
     [Subscription],
     Iterable[LocationForecast] | Awaitable[Iterable[LocationForecast]],
 ]
-MessageSender = Callable[[int, str], object | Awaitable[object]]
+MessageSender = Callable[..., object | Awaitable[object]]
 UserLoader = Callable[[int], User | None]
 
 
 def build_subscription_message(
     subscription: Subscription,
     reports: Iterable[LocationForecast],
+    language: str = "en",
 ) -> str | None:
     selected = select_reports_for_subscription(
         reports,
@@ -37,13 +38,14 @@ def build_subscription_message(
     if not selected:
         return None
 
-    return format_forecast_report(selected)
+    return format_forecast_report(selected, language=language)
 
 
 async def send_due_subscriptions(
     subscriptions: Iterable[Subscription],
     load_reports: ReportsLoader,
     send_message: MessageSender,
+    load_user: UserLoader | None = None,
     log: SupportsExceptionLogging | None = None,
 ) -> None:
     active_log = log or logger
@@ -54,7 +56,9 @@ async def send_due_subscriptions(
 
         try:
             reports = await _maybe_await(load_reports(subscription))
-            message = build_subscription_message(subscription, reports)
+            user = load_user(subscription.user_id) if load_user else None
+            language = user.language if user else "en"
+            message = build_subscription_message(subscription, reports, language=language)
             if message is None:
                 continue
 

@@ -58,7 +58,7 @@ async def test_enable_subscription_callback_creates_enabled_subscription(tmp_pat
     assert subscription.forecast_days == 3
     assert subscription.score_threshold == 60
     assert message.answers == [
-        "Рассылка включена. По умолчанию отправляю ежедневный дайджест в 20:00 UTC."
+        "Alerts enabled. By default, I send a daily digest at 20:00 UTC."
     ]
 
 

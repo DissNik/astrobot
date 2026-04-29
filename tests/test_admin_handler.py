@@ -37,7 +37,7 @@ async def test_stats_command_rejects_non_owner() -> None:
 
     await stats_command(message, owner_telegram_ids=(42,), stats=FakeStats())  # type: ignore[arg-type]
 
-    assert message.answers == ["Команда доступна только владельцу бота."]
+    assert message.answers == ["This command is available only to bot owners."]
 
 
 @pytest.mark.asyncio
@@ -47,5 +47,5 @@ async def test_stats_command_formats_owner_stats() -> None:
     await stats_command(message, owner_telegram_ids=(42, 100), stats=FakeStats())  # type: ignore[arg-type]
 
     assert message.answers == [
-        "Статистика бота:\nПользователи: 2\nЛокации: 3\nАктивные подписки: 1"
+        "Bot statistics:\nUsers: 2\nLocations: 3\nActive subscriptions: 1"
     ]

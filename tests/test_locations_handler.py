@@ -113,7 +113,7 @@ async def test_locations_add_callback_prompts_for_coordinates() -> None:
 
     assert state.state == AddLocationStates.waiting_for_location_input
     assert message.answers == [
-        "Отправьте город, координаты в формате 45.0448, 38.976 или геолокацию Telegram."
+        "Send a city, coordinates like 45.0448, 38.976, or a Telegram location."
     ]
     assert callback.answers == [(None, None)]
 
@@ -146,7 +146,7 @@ async def test_add_location_coordinates_message_stores_location(tmp_path: Path) 
     assert saved_locations[0].longitude == 38.976
     assert saved_locations[0].name == "Поле у реки"
     assert state.cleared is True
-    assert message.answers == ["Введите название локации."]
+    assert message.answers == ["Enter the location name."]
 
 
 @pytest.mark.asyncio
@@ -167,7 +167,7 @@ async def test_add_location_coordinates_message_rejects_invalid_input(tmp_path: 
     assert locations.list_for_user(100) == []
     assert state.cleared is False
     assert message.answers == [
-        "Не смог найти локацию. Отправьте город, координаты или геолокацию Telegram."
+        "I could not find the location. Send a city, coordinates, or a Telegram location."
     ]
 
 
@@ -254,7 +254,7 @@ async def test_locations_list_callback_shows_saved_locations(tmp_path: Path) -> 
 
     await locations_list_callback(callback, locations=locations)  # type: ignore[arg-type]
 
-    assert list_message.answers == ["Ваши локации:\n1. Поле — 45.0448, 38.9760"]
+    assert list_message.answers == ["Your locations:\n1. Поле — 45.0448, 38.9760"]
     assert callback.answers == [(None, None)]
 
 

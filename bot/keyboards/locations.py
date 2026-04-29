@@ -6,8 +6,8 @@ from bot.domain.models import Location
 def locations_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Добавить локацию", callback_data="locations:add")],
-            [InlineKeyboardButton(text="Мои локации", callback_data="locations:list")],
+            [InlineKeyboardButton(text="Add location", callback_data="locations:add")],
+            [InlineKeyboardButton(text="My locations", callback_data="locations:list")],
         ]
     )
 
@@ -29,15 +29,15 @@ def location_manage_keyboard(location: Location) -> InlineKeyboardMarkup:
         raise ValueError("location must have id")
 
     subscription_text = (
-        "Выключить из рассылки"
+        "Disable alerts"
         if location.enabled_for_subscription
-        else "Включить в рассылку"
+        else "Enable alerts"
     )
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="Переименовать",
+                    text="Rename",
                     callback_data=f"locations:rename:{location.id}",
                 )
             ],
@@ -47,7 +47,7 @@ def location_manage_keyboard(location: Location) -> InlineKeyboardMarkup:
                     callback_data=f"locations:toggle_subscription:{location.id}",
                 )
             ],
-            [InlineKeyboardButton(text="Удалить", callback_data=f"locations:delete:{location.id}")],
-            [InlineKeyboardButton(text="К списку", callback_data="locations:list")],
+            [InlineKeyboardButton(text="Delete", callback_data=f"locations:delete:{location.id}")],
+            [InlineKeyboardButton(text="Back to list", callback_data="locations:list")],
         ]
     )

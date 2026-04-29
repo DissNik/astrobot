@@ -12,12 +12,9 @@ from bot.domain.models import Subscription, User
 from bot.keyboards.settings import settings_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
+from bot.texts.i18n import DEFAULT_LANGUAGE, normalize_language, text
 
 router = Router()
-
-SETTINGS_TEXT = "Настройки профиля и рассылки."
-INVALID_TIME_TEXT = "Не смог разобрать время. Введите время в формате HH:MM, например 21:30."
-
 
 class SettingsStates(StatesGroup):
     waiting_for_send_time = State()
@@ -25,15 +22,17 @@ class SettingsStates(StatesGroup):
 
 @router.message(Command("settings"))
 @router.message(F.text == "⚙️ Настройки")
+@router.message(F.text == "⚙️ Settings")
 async def settings_command(
     message: Message,
     users: UserRepository,
     subscriptions: SubscriptionRepository,
 ) -> None:
     user_id = _message_user_id(message)
+    language = _language_for_user(user_id, users)
     await message.answer(
-        _format_settings(user_id, users, subscriptions),
-        reply_markup=settings_keyboard(),
+        _format_settings(user_id, users, subscriptions, language),
+        reply_markup=settings_keyboard(language),
     )
 
 
@@ -43,12 +42,36 @@ async def settings_callback(
     users: UserRepository,
     subscriptions: SubscriptionRepository,
 ) -> None:
+    language = _language_for_user(callback.from_user.id, users)
     if callback.message:
         await callback.message.answer(
-            _format_settings(callback.from_user.id, users, subscriptions),
-            reply_markup=settings_keyboard(),
+            _format_settings(callback.from_user.id, users, subscriptions, language),
+            reply_markup=settings_keyboard(language),
         )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("settings:language:"))
+async def update_language_callback(
+    callback: CallbackQuery,
+    users: UserRepository,
+    subscriptions: SubscriptionRepository,
+    connection: sqlite3.Connection,
+) -> None:
+    raw_language = callback.data.removeprefix("settings:language:") if callback.data else None
+    language = normalize_language(raw_language)
+    user = _ensure_user(callback.from_user.id, users)
+    subscription = _ensure_subscription(user, subscriptions)
+    users.upsert(_replace_user_settings(user, language=language))
+    subscriptions.upsert(subscription)
+    connection.commit()
+    await _send_updated_settings(
+        callback,
+        users,
+        subscriptions,
+        text("language_updated", language),
+        language,
+    )
 
 
 @router.callback_query(F.data.startswith("settings:days:"))
@@ -60,15 +83,22 @@ async def update_forecast_days_callback(
 ) -> None:
     days = _parse_int_callback_value(callback.data, "settings:days:")
     if days not in {3, 5, 7}:
-        await callback.answer("Выберите 3, 5 или 7 ночей.", show_alert=True)
+        await callback.answer("Choose 3, 5, or 7 nights.", show_alert=True)
         return
 
     user = _ensure_user(callback.from_user.id, users)
+    language = user.language
     subscription = _ensure_subscription(user, subscriptions)
     users.upsert(_replace_user_settings(user, forecast_days=days))
     subscriptions.upsert(_replace_subscription_settings(subscription, forecast_days=days))
     connection.commit()
-    await _send_updated_settings(callback, users, subscriptions, "Горизонт прогноза обновлен.")
+    await _send_updated_settings(
+        callback,
+        users,
+        subscriptions,
+        text("days_updated", language),
+        language,
+    )
 
 
 @router.callback_query(F.data.startswith("settings:profile:"))
@@ -80,15 +110,22 @@ async def update_profile_callback(
 ) -> None:
     profile = _parse_profile(callback.data)
     if profile is None:
-        await callback.answer("Неизвестный профиль наблюдений.", show_alert=True)
+        await callback.answer("Unknown observing profile.", show_alert=True)
         return
 
     user = _ensure_user(callback.from_user.id, users)
+    language = user.language
     subscription = _ensure_subscription(user, subscriptions)
     users.upsert(_replace_user_settings(user, observing_profile=profile))
     subscriptions.upsert(_replace_subscription_settings(subscription, observing_profile=profile))
     connection.commit()
-    await _send_updated_settings(callback, users, subscriptions, "Профиль наблюдений обновлен.")
+    await _send_updated_settings(
+        callback,
+        users,
+        subscriptions,
+        text("profile_updated", language),
+        language,
+    )
 
 
 @router.callback_query(F.data.startswith("settings:threshold:"))
@@ -100,15 +137,22 @@ async def update_threshold_callback(
 ) -> None:
     threshold = _parse_int_callback_value(callback.data, "settings:threshold:")
     if threshold is None or not 0 <= threshold <= 100:
-        await callback.answer("Порог должен быть от 0 до 100.", show_alert=True)
+        await callback.answer("Threshold must be from 0 to 100.", show_alert=True)
         return
 
     user = _ensure_user(callback.from_user.id, users)
+    language = user.language
     subscription = _ensure_subscription(user, subscriptions)
     users.upsert(_replace_user_settings(user, score_threshold=threshold))
     subscriptions.upsert(_replace_subscription_settings(subscription, score_threshold=threshold))
     connection.commit()
-    await _send_updated_settings(callback, users, subscriptions, "Порог хороших условий обновлен.")
+    await _send_updated_settings(
+        callback,
+        users,
+        subscriptions,
+        text("threshold_updated", language),
+        language,
+    )
 
 
 @router.callback_query(F.data.startswith("settings:mode:"))
@@ -120,22 +164,34 @@ async def update_subscription_mode_callback(
 ) -> None:
     mode = _parse_subscription_mode(callback.data)
     if mode is None:
-        await callback.answer("Неизвестный режим рассылки.", show_alert=True)
+        await callback.answer("Unknown notification mode.", show_alert=True)
         return
 
     user = _ensure_user(callback.from_user.id, users)
+    language = user.language
     subscription = _ensure_subscription(user, subscriptions)
     users.upsert(user)
     subscriptions.upsert(_replace_subscription_settings(subscription, mode=mode))
     connection.commit()
-    await _send_updated_settings(callback, users, subscriptions, "Режим рассылки обновлен.")
+    await _send_updated_settings(
+        callback,
+        users,
+        subscriptions,
+        text("mode_updated", language),
+        language,
+    )
 
 
 @router.callback_query(F.data == "settings:time")
-async def settings_time_callback(callback: CallbackQuery, state: FSMContext) -> None:
+async def settings_time_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+    users: UserRepository,
+) -> None:
     await state.set_state(SettingsStates.waiting_for_send_time)
+    language = _language_for_user(callback.from_user.id, users)
     if callback.message:
-        await callback.message.answer("Введите время рассылки в формате HH:MM.")
+        await callback.message.answer(text("enter_send_time", language))
     await callback.answer()
 
 
@@ -148,13 +204,14 @@ async def settings_time_message(
     connection: sqlite3.Connection,
 ) -> None:
     send_time = _parse_time(message.text)
+    user_id = _message_user_id(message)
+    language = _language_for_user(user_id, users)
     if send_time is None:
-        await message.answer(INVALID_TIME_TEXT)
+        await message.answer(text("invalid_send_time", language))
         return
 
-    user_id = _message_user_id(message)
     if user_id is None:
-        await message.answer(INVALID_TIME_TEXT)
+        await message.answer(text("invalid_send_time", language))
         return
 
     user = _ensure_user(user_id, users)
@@ -164,8 +221,10 @@ async def settings_time_message(
     connection.commit()
     await state.clear()
     await message.answer(
-        "Время рассылки обновлено.\n\n" + _format_settings(user_id, users, subscriptions),
-        reply_markup=settings_keyboard(),
+        text("send_time_updated", language)
+        + "\n\n"
+        + _format_settings(user_id, users, subscriptions, language),
+        reply_markup=settings_keyboard(language),
     )
 
 
@@ -173,9 +232,11 @@ def _format_settings(
     user_id: int | None,
     users: UserRepository,
     subscriptions: SubscriptionRepository,
+    language: str = DEFAULT_LANGUAGE,
 ) -> str:
+    language = normalize_language(language)
     if user_id is None:
-        return SETTINGS_TEXT
+        return text("settings_title", language)
 
     user = users.get(user_id)
     subscription = subscriptions.get(user_id)
@@ -188,14 +249,15 @@ def _format_settings(
     mode = subscription.mode if subscription else SubscriptionMode.DAILY_DIGEST
     enabled = subscription.enabled if subscription else False
 
+    subscription_state = text("enabled" if enabled else "disabled", language)
     return (
-        f"{SETTINGS_TEXT}\n"
-        f"Горизонт прогноза: {forecast_days} ночи\n"
-        f"Профиль наблюдений: {_format_profile(profile)}\n"
-        f"Рассылка: {'включена' if enabled else 'отключена'}\n"
-        f"Время рассылки: {send_time}\n"
-        f"Режим рассылки: {_format_mode(mode)}\n"
-        f"Порог хороших условий: {threshold}/100"
+        f"{text('settings_title', language)}\n"
+        f"{text('forecast_days', language)}: {forecast_days} {text('nights', language)}\n"
+        f"{text('observing_profile', language)}: {_format_profile(profile, language)}\n"
+        f"{text('subscription', language)}: {subscription_state}\n"
+        f"{text('send_time', language)}: {send_time}\n"
+        f"{text('subscription_mode', language)}: {_format_mode(mode, language)}\n"
+        f"{text('threshold', language)}: {threshold}/100"
     )
 
 
@@ -205,17 +267,17 @@ def _message_user_id(message: Message) -> int | None:
     return message.from_user.id
 
 
-def _format_profile(profile: ObservingProfile) -> str:
+def _format_profile(profile: ObservingProfile, language: str) -> str:
     return {
-        ObservingProfile.DEEP_SKY: "deep-sky",
-        ObservingProfile.PLANETARY_LUNAR: "планеты/Луна",
+        ObservingProfile.DEEP_SKY: text("deep_sky", language),
+        ObservingProfile.PLANETARY_LUNAR: text("planetary_lunar", language),
     }[profile]
 
 
-def _format_mode(mode: SubscriptionMode) -> str:
+def _format_mode(mode: SubscriptionMode, language: str) -> str:
     return {
-        SubscriptionMode.DAILY_DIGEST: "ежедневный дайджест",
-        SubscriptionMode.GOOD_CONDITIONS_ONLY: "только хорошие условия",
+        SubscriptionMode.DAILY_DIGEST: text("daily_digest", language),
+        SubscriptionMode.GOOD_CONDITIONS_ONLY: text("good_conditions_only", language),
     }[mode]
 
 
@@ -224,11 +286,13 @@ async def _send_updated_settings(
     users: UserRepository,
     subscriptions: SubscriptionRepository,
     message: str,
+    language: str,
 ) -> None:
     if callback.message:
+        settings_text = _format_settings(callback.from_user.id, users, subscriptions, language)
         await callback.message.answer(
-            f"{message}\n\n{_format_settings(callback.from_user.id, users, subscriptions)}",
-            reply_markup=settings_keyboard(),
+            f"{message}\n\n{settings_text}",
+            reply_markup=settings_keyboard(language),
         )
     await callback.answer()
 
@@ -241,7 +305,7 @@ def _ensure_user(user_id: int, users: UserRepository) -> User:
     return User(
         telegram_id=user_id,
         timezone="UTC",
-        language="ru",
+        language=DEFAULT_LANGUAGE,
         forecast_days=3,
         observing_profile=ObservingProfile.DEEP_SKY,
         score_threshold=60,
@@ -271,11 +335,12 @@ def _replace_user_settings(
     forecast_days: int | None = None,
     observing_profile: ObservingProfile | None = None,
     score_threshold: int | None = None,
+    language: str | None = None,
 ) -> User:
     return User(
         telegram_id=user.telegram_id,
         timezone=user.timezone,
-        language=user.language,
+        language=normalize_language(language or user.language),
         forecast_days=forecast_days if forecast_days is not None else user.forecast_days,
         observing_profile=observing_profile or user.observing_profile,
         score_threshold=score_threshold if score_threshold is not None else user.score_threshold,
@@ -339,3 +404,12 @@ def _parse_time(text: str | None) -> time | None:
         return time.fromisoformat(text.strip())
     except ValueError:
         return None
+
+
+def _language_for_user(user_id: int | None, users: UserRepository) -> str:
+    if user_id is None:
+        return DEFAULT_LANGUAGE
+    user = users.get(user_id)
+    if user is None:
+        return DEFAULT_LANGUAGE
+    return normalize_language(user.language)

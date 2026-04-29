@@ -10,30 +10,35 @@ from bot.repositories.locations import LocationRepository
 from bot.repositories.users import UserRepository
 from bot.services.forecast_service import build_location_forecast, provider_days_for_nights
 from bot.services.report_formatter import FORECAST_PARSE_MODE, format_forecast_report
+from bot.texts.i18n import DEFAULT_LANGUAGE, normalize_language, text
 
 router = Router()
 
-FORECAST_TEXT = "Прогноз. Выберите локацию наблюдения, чтобы получить астрономический прогноз."
-SELECT_LOCATION_TEXT = "Выберите локацию наблюдения для прогноза."
-NO_LOCATIONS_TEXT = "Сначала добавьте локацию наблюдения в разделе «Локации»."
-LOCATION_NOT_FOUND_TEXT = "Не нашел эту локацию наблюдения. Откройте прогноз заново."
-FORECAST_ERROR_TEXT = "Не удалось получить прогноз. Попробуйте позже."
-
-
 @router.message(Command("forecast"))
 @router.message(F.text == "🔭 Прогноз")
-async def forecast_command(message: Message, locations: LocationRepository) -> None:
+@router.message(F.text == "🔭 Forecast")
+async def forecast_command(
+    message: Message,
+    locations: LocationRepository,
+    users: UserRepository,
+) -> None:
     user_id = _message_user_id(message)
+    language = _language_for_user(user_id, users)
     if user_id is None:
-        await message.answer(NO_LOCATIONS_TEXT)
+        await message.answer(text("add_location_first", language))
         return
-    await _send_forecast_locations(message, user_id, locations)
+    await _send_forecast_locations(message, user_id, locations, language)
 
 
 @router.callback_query(F.data == "forecast:open")
-async def forecast_callback(callback: CallbackQuery, locations: LocationRepository) -> None:
+async def forecast_callback(
+    callback: CallbackQuery,
+    locations: LocationRepository,
+    users: UserRepository,
+) -> None:
+    language = _language_for_user(callback.from_user.id, users)
     if callback.message:
-        await _send_forecast_locations(callback.message, callback.from_user.id, locations)
+        await _send_forecast_locations(callback.message, callback.from_user.id, locations, language)
     await callback.answer()
 
 
@@ -47,10 +52,11 @@ async def forecast_location_callback(
     location_id = _parse_location_id(callback.data)
     location = _find_user_location(locations, callback.from_user.id, location_id)
     if location is None:
-        await callback.answer(LOCATION_NOT_FOUND_TEXT, show_alert=True)
+        await callback.answer(text("location_not_found", DEFAULT_LANGUAGE), show_alert=True)
         return
 
     user = users.get(callback.from_user.id)
+    language = normalize_language(user.language if user is not None else None)
     profile = user.observing_profile if user is not None else ObservingProfile.DEEP_SKY
     forecast_days = user.forecast_days if user is not None else 3
 
@@ -61,15 +67,15 @@ async def forecast_location_callback(
             days=provider_days_for_nights(forecast_days),
         )
     except Exception:
-        await callback.answer(FORECAST_ERROR_TEXT, show_alert=True)
+        await callback.answer(text("forecast_error", language), show_alert=True)
         return
 
     report = build_location_forecast(location, provider_forecast, profile)
     if callback.message:
         await callback.message.answer(
-            format_forecast_report([report]),
+            format_forecast_report([report], language=language),
             parse_mode=FORECAST_PARSE_MODE,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(language),
         )
     await callback.answer()
 
@@ -78,14 +84,15 @@ async def _send_forecast_locations(
     message: Message,
     user_id: int,
     locations: LocationRepository,
+    language: str,
 ) -> None:
     saved_locations = locations.list_for_user(user_id)
     if not saved_locations:
-        await message.answer(NO_LOCATIONS_TEXT)
+        await message.answer(text("add_location_first", language))
         return
 
     await message.answer(
-        SELECT_LOCATION_TEXT,
+        text("choose_location", language),
         reply_markup=forecast_locations_keyboard(saved_locations),
     )
 
@@ -117,3 +124,12 @@ def _message_user_id(message: Message) -> int | None:
     if message.from_user is None:
         return None
     return message.from_user.id
+
+
+def _language_for_user(user_id: int | None, users: UserRepository) -> str:
+    if user_id is None:
+        return DEFAULT_LANGUAGE
+    user = users.get(user_id)
+    if user is None:
+        return DEFAULT_LANGUAGE
+    return normalize_language(user.language)

@@ -19,20 +19,21 @@ from bot.providers.geocoding import GeocodingClient
 from bot.repositories.locations import LocationRepository
 from bot.repositories.users import UserRepository
 from bot.services.location_service import build_location_from_coordinates
+from bot.texts.i18n import DEFAULT_LANGUAGE
 
 router = Router()
 
-LOCATIONS_TEXT = "Локации наблюдения. Здесь можно управлять сохраненными местами."
+LOCATIONS_TEXT = "Observing locations. Manage your saved places here."
 ADD_LOCATION_PROMPT = (
-    "Отправьте город, координаты в формате 45.0448, 38.976 или геолокацию Telegram."
+    "Send a city, coordinates like 45.0448, 38.976, or a Telegram location."
 )
 INVALID_COORDINATES_TEXT = (
-    "Не смог найти локацию. Отправьте город, координаты или геолокацию Telegram."
+    "I could not find the location. Send a city, coordinates, or a Telegram location."
 )
-LOCATION_NAME_PROMPT = "Введите название локации."
-INVALID_LOCATION_NAME_TEXT = "Название локации не должно быть пустым."
-LOCATION_NOT_FOUND_TEXT = "Не нашел эту локацию. Откройте список локаций заново."
-RENAME_LOCATION_PROMPT = "Введите новое название локации."
+LOCATION_NAME_PROMPT = "Enter the location name."
+INVALID_LOCATION_NAME_TEXT = "Location name must not be empty."
+LOCATION_NOT_FOUND_TEXT = "I could not find this location. Open the location list again."
+RENAME_LOCATION_PROMPT = "Enter a new location name."
 
 
 class AddLocationStates(StatesGroup):
@@ -111,7 +112,7 @@ async def add_location_name_message(
         User(
             telegram_id=user_id,
             timezone="UTC",
-            language="ru",
+            language=DEFAULT_LANGUAGE,
             forecast_days=3,
             observing_profile=ObservingProfile.DEEP_SKY,
             score_threshold=60,
@@ -133,7 +134,7 @@ async def add_location_name_message(
     )
     connection.commit()
     await state.clear()
-    await message.answer(f"Локация сохранена: {location.name}", reply_markup=main_menu_keyboard())
+    await message.answer(f"Location saved: {location.name}", reply_markup=main_menu_keyboard())
 
 
 @router.callback_query(F.data == "locations:list")
@@ -201,7 +202,7 @@ async def rename_location_message(
     locations.rename_for_user(int(location_id), user_id, name)
     connection.commit()
     await state.clear()
-    await message.answer(f"Локация переименована: {name}", reply_markup=main_menu_keyboard())
+    await message.answer(f"Location renamed: {name}", reply_markup=main_menu_keyboard())
 
 
 @router.callback_query(F.data.startswith("locations:delete:"))
@@ -218,7 +219,7 @@ async def delete_location_callback(
     locations.delete_for_user(location_id, callback.from_user.id)
     connection.commit()
     if callback.message:
-        await callback.message.answer("Локация удалена.", reply_markup=main_menu_keyboard())
+        await callback.message.answer("Location deleted.", reply_markup=main_menu_keyboard())
     await callback.answer()
 
 
@@ -237,7 +238,7 @@ async def toggle_location_subscription_callback(
     enabled = not location.enabled_for_subscription
     locations.set_subscription_enabled_for_user(location.id, callback.from_user.id, enabled)
     connection.commit()
-    text = "Локация включена в рассылку." if enabled else "Локация выключена из рассылки."
+    text = "Location enabled for alerts." if enabled else "Location disabled for alerts."
     if callback.message:
         await callback.message.answer(text, reply_markup=main_menu_keyboard())
     await callback.answer()
@@ -264,14 +265,14 @@ def _parse_coordinates(text: str | None) -> tuple[float, float] | None:
 
 
 def _default_location_name(latitude: float, longitude: float) -> str:
-    return f"Локация {latitude:.4f}, {longitude:.4f}"
+    return f"Location {latitude:.4f}, {longitude:.4f}"
 
 
 def _format_locations(locations: list) -> str:
     if not locations:
-        return "У вас пока нет сохраненных локаций."
+        return "You do not have saved locations yet."
 
-    lines = ["Ваши локации:"]
+    lines = ["Your locations:"]
     for index, location in enumerate(locations, start=1):
         lines.append(
             f"{index}. {location.name} — {location.latitude:.4f}, {location.longitude:.4f}"
@@ -354,18 +355,18 @@ def _find_location_for_callback(
 
 
 def _format_location_details(location) -> str:  # noqa: ANN001
-    subscription = "включена" if location.enabled_for_subscription else "выключена"
+    subscription = "enabled" if location.enabled_for_subscription else "disabled"
     return (
         f"{location.name}\n"
-        f"Координаты: {location.latitude:.4f}, {location.longitude:.4f}\n"
-        f"Источник: {_format_source(location.source)}\n"
-        f"Рассылка: {subscription}"
+        f"Coordinates: {location.latitude:.4f}, {location.longitude:.4f}\n"
+        f"Source: {_format_source(location.source)}\n"
+        f"Alerts: {subscription}"
     )
 
 
 def _format_source(source: LocationSource) -> str:
     return {
-        LocationSource.CITY: "город",
-        LocationSource.COORDINATES: "координаты",
-        LocationSource.TELEGRAM_GEO: "геолокация Telegram",
+        LocationSource.CITY: "city",
+        LocationSource.COORDINATES: "coordinates",
+        LocationSource.TELEGRAM_GEO: "Telegram location",
     }[source]

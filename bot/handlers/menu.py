@@ -5,7 +5,7 @@ from bot.keyboards.menu import main_menu_keyboard
 
 router = Router()
 
-MENU_TEXT = "Главное меню"
+MENU_TEXT = "Main menu"
 
 
 async def send_main_menu(message: Message) -> None:
