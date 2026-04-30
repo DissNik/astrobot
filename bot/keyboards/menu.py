@@ -18,5 +18,4 @@ def main_menu_keyboard(language: str = "en") -> ReplyKeyboardMarkup:
             ],
         ],
         resize_keyboard=True,
-        is_persistent=True,
     )

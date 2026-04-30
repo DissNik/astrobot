@@ -14,6 +14,7 @@ def test_main_menu_keyboard_contains_core_actions() -> None:
     assert "📬 Alerts" in labels
     assert "⚙️ Settings" in labels
     assert keyboard.resize_keyboard is True
+    assert keyboard.is_persistent is None
 
 
 def test_main_menu_keyboard_supports_russian() -> None:
