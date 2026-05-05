@@ -38,7 +38,32 @@ def test_keyboards_emit_known_callback_data() -> None:
         "locations:list",
         "subscription:enable",
         "subscription:disable",
+        "settings:open",
     }
+
+
+def test_subscription_keyboard_marks_current_state_and_links_settings() -> None:
+    keyboard = subscription_keyboard("ru", enabled=False)
+    rows = [
+        [(button.callback_data, button.text) for button in row]
+        for row in keyboard.inline_keyboard
+    ]
+
+    assert rows[0] == [
+        ("subscription:enable", "Включить рассылку"),
+        ("subscription:disable", "✅ Отключить рассылку"),
+    ]
+    assert rows[1] == [("settings:open", "⚙️ Настройки")]
+
+    enabled_keyboard = subscription_keyboard("ru", enabled=True)
+    enabled_labels = {
+        button.callback_data: button.text
+        for row in enabled_keyboard.inline_keyboard
+        for button in row
+    }
+
+    assert enabled_labels["subscription:enable"] == "✅ Включить рассылку"
+    assert enabled_labels["subscription:disable"] == "Отключить рассылку"
 
 
 def test_settings_keyboard_uses_wide_rows_for_long_russian_labels() -> None:

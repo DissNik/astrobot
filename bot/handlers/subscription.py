@@ -33,7 +33,10 @@ async def subscribe_command(
     user_id = message.from_user.id if message.from_user else None
     await message.answer(
         _format_subscription_menu(user_id, users, subscriptions),
-        reply_markup=subscription_keyboard(language),
+        reply_markup=subscription_keyboard(
+            language,
+            enabled=_subscription_enabled_for_menu(user_id, subscriptions),
+        ),
     )
 
 
@@ -48,7 +51,10 @@ async def subscription_callback(
         await edit_callback_message(
             callback.message,
             _format_subscription_menu(callback.from_user.id, users, subscriptions),
-            reply_markup=subscription_keyboard(language),
+            reply_markup=subscription_keyboard(
+                language,
+                enabled=_subscription_enabled_for_menu(callback.from_user.id, subscriptions),
+            ),
         )
     await callback.answer()
 
@@ -69,7 +75,7 @@ async def enable_subscription_callback(
         await edit_callback_message(
             callback.message,
             _format_subscription_menu_for_values(subscription, user.timezone, language),
-            reply_markup=subscription_keyboard(language),
+            reply_markup=subscription_keyboard(language, enabled=subscription.enabled),
         )
     await callback.answer()
 
@@ -90,7 +96,7 @@ async def disable_subscription_callback(
         await edit_callback_message(
             callback.message,
             _format_subscription_menu_for_values(subscription, user.timezone, language),
-            reply_markup=subscription_keyboard(language),
+            reply_markup=subscription_keyboard(language, enabled=subscription.enabled),
         )
     await callback.answer()
 
@@ -125,6 +131,17 @@ def _subscription_for_menu(
 
     fallback_user = user or build_default_user(user_id or 0)
     return build_default_subscription(fallback_user)
+
+
+def _subscription_enabled_for_menu(
+    user_id: int | None,
+    subscriptions: SubscriptionRepository | None,
+) -> bool:
+    if user_id is None or subscriptions is None:
+        return False
+
+    subscription = subscriptions.get(user_id)
+    return subscription.enabled if subscription else False
 
 
 def _format_subscription_menu_for_values(
