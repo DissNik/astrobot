@@ -16,7 +16,6 @@ from bot.handlers.common import (
 )
 from bot.keyboards.locations import (
     location_manage_keyboard,
-    locations_keyboard,
     locations_list_keyboard,
 )
 from bot.keyboards.menu import main_menu_keyboard
@@ -39,21 +38,33 @@ class AddLocationStates(StatesGroup):
 @router.message(Command("locations"))
 @router.message(F.text == "📍 Локации")
 @router.message(F.text == "📍 Locations")
-async def locations_command(message: Message, users: UserRepository | None = None) -> None:
+async def locations_command(
+    message: Message,
+    locations: LocationRepository,
+    users: UserRepository | None = None,
+) -> None:
     language = language_for_message(message, users)
+    user_id = message_user_id(message)
+    saved_locations = locations.list_for_user(user_id) if user_id is not None else []
     await message.answer(
-        text("locations_text", language), reply_markup=locations_keyboard(language)
+        _format_locations(saved_locations, language),
+        reply_markup=locations_list_keyboard(saved_locations, language),
     )
 
 
 @router.callback_query(F.data == "locations:open")
-async def locations_callback(callback: CallbackQuery, users: UserRepository | None = None) -> None:
+async def locations_callback(
+    callback: CallbackQuery,
+    locations: LocationRepository,
+    users: UserRepository | None = None,
+) -> None:
     language = language_for_user(callback.from_user.id, users)
+    saved_locations = locations.list_for_user(callback.from_user.id)
     if callback.message:
         await edit_callback_message(
             callback.message,
-            text("locations_text", language),
-            reply_markup=locations_keyboard(language),
+            _format_locations(saved_locations, language),
+            reply_markup=locations_list_keyboard(saved_locations, language),
         )
     await callback.answer()
 
@@ -312,12 +323,7 @@ def _format_locations(locations: list, language: str = DEFAULT_LANGUAGE) -> str:
     if not locations:
         return text("no_saved_locations", language)
 
-    lines = [text("your_locations", language)]
-    for index, location in enumerate(locations, start=1):
-        lines.append(
-            f"{index}. {location.name} — {location.latitude:.4f}, {location.longitude:.4f}"
-        )
-    return "\n".join(lines)
+    return text("your_locations", language)
 
 
 async def _resolve_location_input(
@@ -404,4 +410,3 @@ def _format_source(source: LocationSource, language: str = DEFAULT_LANGUAGE) -> 
         LocationSource.COORDINATES: text("source_coordinates", language),
         LocationSource.TELEGRAM_GEO: text("source_telegram_geo", language),
     }[source]
-

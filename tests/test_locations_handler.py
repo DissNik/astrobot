@@ -16,6 +16,7 @@ from bot.handlers.locations import (
     location_manage_callback,
     locations_add_callback,
     locations_callback,
+    locations_command,
     locations_list_callback,
     rename_location_callback,
     rename_location_message,
@@ -303,21 +304,37 @@ async def test_locations_list_callback_shows_saved_locations(tmp_path: Path) -> 
 
     assert list_message.answers == []
     text_value, keyboard = list_message.edits[0]
-    assert text_value == "Your locations:\n1. Поле — 45.0448, 38.9760"
-    assert keyboard.inline_keyboard[-1][0].text == "Back"
-    assert keyboard.inline_keyboard[-1][0].callback_data == "locations:open"
+    assert text_value == "Your locations:"
+    assert keyboard.inline_keyboard[0][0].text == "Поле"
+    assert keyboard.inline_keyboard[0][0].callback_data == "locations:manage:1"
+    assert keyboard.inline_keyboard[-1][0].text == "➕ Add location"
+    assert keyboard.inline_keyboard[-1][0].callback_data == "locations:add"
     assert callback.answers == [(None, None)]
 
 
 @pytest.mark.asyncio
-async def test_locations_open_callback_edits_current_message() -> None:
+async def test_locations_command_opens_locations_list(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
+    message = FakeMessage(user_id=100)
+
+    await locations_command(message, users=users, locations=locations)  # type: ignore[arg-type]
+
+    assert message.answers[0] == "You do not have saved locations yet."
+    keyboard = message.reply_markups[0]
+    assert keyboard.inline_keyboard[0][0].text == "➕ Add location"
+    assert keyboard.inline_keyboard[0][0].callback_data == "locations:add"
+
+
+@pytest.mark.asyncio
+async def test_locations_open_callback_edits_current_message(tmp_path: Path) -> None:
+    users, locations = _repositories(tmp_path)
     message = FakeMessage(user_id=100)
     callback = FakeCallback(user_id=100, message=message)
 
-    await locations_callback(callback)  # type: ignore[arg-type]
+    await locations_callback(callback, locations=locations, users=users)  # type: ignore[arg-type]
 
     assert message.answers == []
-    assert message.edits[0][0] == "Observing locations. Manage your saved places here."
+    assert message.edits[0][0] == "You do not have saved locations yet."
     assert callback.answers == [(None, None)]
 
 
@@ -451,8 +468,8 @@ async def test_location_can_be_deleted(tmp_path: Path) -> None:
     text_value, keyboard = callback.message.edits[0]
     assert text_value == "You do not have saved locations yet."
     assert keyboard.inline_keyboard == [[keyboard.inline_keyboard[0][0]]]
-    assert keyboard.inline_keyboard[0][0].text == "Back"
-    assert keyboard.inline_keyboard[0][0].callback_data == "locations:open"
+    assert keyboard.inline_keyboard[0][0].text == "➕ Add location"
+    assert keyboard.inline_keyboard[0][0].callback_data == "locations:add"
 
 
 def test_location_manage_callback_exists_for_saved_location() -> None:

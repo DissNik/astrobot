@@ -35,8 +35,8 @@ def locations_list_keyboard(
     rows.append(
         [
             InlineKeyboardButton(
-                text=text("back", language),
-                callback_data="locations:open",
+                text=f"➕ {text('add_location', language)}",
+                callback_data="locations:add",
             )
         ]
     )
