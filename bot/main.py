@@ -14,6 +14,7 @@ from bot.db.migrations import migrate
 from bot.handlers import admin, forecast, locations, menu, start
 from bot.handlers import settings as settings_handler
 from bot.handlers import subscription as subscription_handler
+from bot.middlewares.menu_state import MainMenuStateResetMiddleware
 from bot.providers.geocoding import GeocodingClient
 from bot.providers.open_meteo import OpenMeteoClient
 from bot.repositories.forecast_cache import ForecastCacheRepository
@@ -87,6 +88,7 @@ def create_app_context(settings: Settings) -> AppContext:
     dispatcher["connection"] = connection
     dispatcher["geocoding"] = providers.geocoding
     dispatcher["weather"] = providers.weather
+    dispatcher.message.outer_middleware(MainMenuStateResetMiddleware())
 
     for router in _routers():
         dispatcher.include_router(router)
