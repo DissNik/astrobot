@@ -49,7 +49,7 @@ def test_format_forecast_report_defaults_to_english() -> None:
         "☾ <b>Moon:</b> 24%, visible\n"
         "◦ <b>Humidity:</b> 70%\n"
         "→ <b>Wind:</b> 4.2 m/s\n"
-        "✓ <b>Factors:</b> low cloud cover"
+        "<b>Factors:</b> low cloud cover"
         "</blockquote>"
     ) in text
 
@@ -92,7 +92,7 @@ def test_format_forecast_report_supports_russian() -> None:
     assert "✅ <b>2026-04-26</b> — <b>78/100</b>, можно ехать" in text
     assert "☁ <b>Облака:</b> 15%, высокие 8%" in text
     assert "☾ <b>Луна:</b> 24%, не видна" in text
-    assert "✓ <b>Факторы:</b> мало облаков, Луна не видна" in text
+    assert "<b>Факторы:</b> мало облаков, Луна не видна" in text
 
 
 def test_format_forecast_report_adds_not_visible_moon_to_english_factors() -> None:
@@ -128,7 +128,7 @@ def test_format_forecast_report_adds_not_visible_moon_to_english_factors() -> No
 
     text = format_forecast_report([report])
 
-    assert "✓ <b>Factors:</b> Moon not visible" in text
+    assert "<b>Factors:</b> Moon not visible" in text
 
 
 def test_format_forecast_report_uses_status_icon_for_bad_and_doubtful_nights() -> None:
@@ -177,9 +177,11 @@ def test_format_forecast_report_uses_status_icon_for_bad_and_doubtful_nights() -
     text = format_forecast_report([report], language="ru")
 
     assert "❌ <b>2026-04-26</b> — <b>38/100</b>, не стоит" in text
-    assert "× <b>Факторы:</b> умеренно высокая влажность, сильный ветер, Луна не видна" in text
+    assert "<b>Факторы:</b> умеренно высокая влажность, сильный ветер, Луна не видна" in text
     assert "⚠️ <b>2026-04-27</b> — <b>55/100</b>, сомнительно" in text
-    assert "! <b>Факторы:</b> нет заметных факторов" in text
+    assert "<b>Факторы:</b> нет заметных факторов" in text
+    assert "× <b>Факторы:</b>" not in text
+    assert "! <b>Факторы:</b>" not in text
     assert "</blockquote>\n\n⚠️ <b>2026-04-27</b>" in text
 
 

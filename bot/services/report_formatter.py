@@ -35,7 +35,7 @@ def format_forecast_report(reports: list[LocationForecast], language: str = "en"
                     f"◦ <b>{text('humidity', language)}:</b> {night.humidity}%",
                     f"→ <b>{text('wind', language)}:</b> {night.wind_speed:.1f} m/s",
                     (
-                        f"{_factors_icon(night.verdict)} <b>{text('factors', language)}:</b> "
+                        f"<b>{text('factors', language)}:</b> "
                         f"{_format_display_factors(night, language)}"
                     ),
                 ]
@@ -61,14 +61,6 @@ def _verdict_icon(verdict: str) -> str:
     if verdict == "сомнительно":
         return "⚠️"
     return "✅"
-
-
-def _factors_icon(verdict: str) -> str:
-    if verdict == "не стоит":
-        return "×"
-    if verdict == "сомнительно":
-        return "!"
-    return "✓"
 
 
 def _format_display_factors(night: NightForecast, language: str) -> str:
