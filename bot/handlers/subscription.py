@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery, Message
 from bot.domain.enums import SubscriptionMode
 from bot.domain.models import Subscription, User
 from bot.handlers.common import edit_callback_message, language_for_message, language_for_user
+from bot.handlers.menu_format import MENU_PARSE_MODE, format_menu_message
 from bot.keyboards.subscription import subscription_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
@@ -37,6 +38,7 @@ async def subscribe_command(
             language,
             enabled=_subscription_enabled_for_menu(user_id, subscriptions),
         ),
+        parse_mode=MENU_PARSE_MODE,
     )
 
 
@@ -55,6 +57,7 @@ async def subscription_callback(
                 language,
                 enabled=_subscription_enabled_for_menu(callback.from_user.id, subscriptions),
             ),
+            parse_mode=MENU_PARSE_MODE,
         )
     await callback.answer()
 
@@ -76,6 +79,7 @@ async def enable_subscription_callback(
             callback.message,
             _format_subscription_menu_for_values(subscription, user.timezone, language),
             reply_markup=subscription_keyboard(language, enabled=subscription.enabled),
+            parse_mode=MENU_PARSE_MODE,
         )
     await callback.answer()
 
@@ -97,6 +101,7 @@ async def disable_subscription_callback(
             callback.message,
             _format_subscription_menu_for_values(subscription, user.timezone, language),
             reply_markup=subscription_keyboard(language, enabled=subscription.enabled),
+            parse_mode=MENU_PARSE_MODE,
         )
     await callback.answer()
 
@@ -152,13 +157,13 @@ def _format_subscription_menu_for_values(
     language = normalize_language(language)
     send_time = subscription.send_time_local.isoformat(timespec="minutes")
     subscription_state = text("enabled" if subscription.enabled else "disabled", language)
-    return (
-        f"📬 {_subscription_label('title', language)}\n\n"
+    body = (
         f"🔔 {_subscription_label('subscription', language)}: {subscription_state}\n"
         f"🕘 {_subscription_label('time', language)}: {send_time} {timezone}\n"
         f"📬 {_subscription_label('mode', language)}: {_format_mode(subscription.mode, language)}\n"
         f"⭐ {_subscription_label('threshold', language)}: {subscription.score_threshold}/100"
     )
+    return format_menu_message("📬", _subscription_label("title", language), body)
 
 
 def _format_mode(mode: SubscriptionMode, language: str) -> str:

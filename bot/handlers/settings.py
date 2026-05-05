@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.domain.models import Subscription, User
 from bot.handlers.common import edit_callback_message, language_for_user, message_user_id
+from bot.handlers.menu_format import MENU_PARSE_MODE, format_menu_message
 from bot.keyboards.menu import main_menu_keyboard
 from bot.keyboards.settings import settings_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
@@ -39,6 +40,7 @@ async def settings_command(
     await message.answer(
         _format_settings(user_id, users, subscriptions, language),
         reply_markup=_settings_keyboard_for_user(user_id, users, subscriptions, language),
+        parse_mode=MENU_PARSE_MODE,
     )
 
 
@@ -55,6 +57,7 @@ async def settings_callback(
             reply_markup=_settings_keyboard_for_user(
                 callback.from_user.id, users, subscriptions, language
             ),
+            parse_mode=MENU_PARSE_MODE,
         )
     await callback.answer()
 
@@ -261,8 +264,7 @@ def _format_settings(
     enabled = subscription.enabled if subscription else False
 
     subscription_state = text("enabled" if enabled else "disabled", language)
-    return (
-        f"⚙️ {text('settings_title', language).rstrip('.')}\n\n"
+    body = (
         f"🌙 {_settings_label('forecast', language)}: {forecast_days} {text('nights', language)}\n"
         f"🔭 {_settings_label('profile', language)}: {_format_profile(profile, language)}\n"
         f"🔔 {_settings_label('subscription', language)}: {subscription_state}\n"
@@ -270,6 +272,7 @@ def _format_settings(
         f"📬 {_settings_label('mode', language)}: {_format_mode(mode, language)}\n"
         f"⭐ {_settings_label('threshold', language)}: {threshold}/100"
     )
+    return format_menu_message("⚙️", text("settings_title", language).rstrip("."), body)
 
 
 def _format_profile(profile: ObservingProfile, language: str) -> str:
@@ -323,6 +326,7 @@ async def _send_updated_settings(
             reply_markup=_settings_keyboard_for_user(
                 callback.from_user.id, users, subscriptions, language
             ),
+            parse_mode=MENU_PARSE_MODE,
         )
         if refresh_main_menu:
             await callback.message.answer(

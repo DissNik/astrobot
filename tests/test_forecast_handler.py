@@ -129,10 +129,10 @@ async def test_forecast_callback_shows_saved_location_buttons(tmp_path: Path) ->
     await forecast_callback(callback, locations=locations, users=users)  # type: ignore[arg-type]
 
     text, keyboard, parse_mode = message.answers[0]
-    assert text == "Choose an observing location for the forecast."
+    assert text == "<b>🔭 Choose an observing location for the forecast.</b>"
     assert keyboard.inline_keyboard[0][0].text == "Поле"
     assert keyboard.inline_keyboard[0][0].callback_data == "forecast:location:1"
-    assert parse_mode is None
+    assert parse_mode == "HTML"
     assert callback.answers == [(None, None)]
 
 

@@ -3,6 +3,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from bot.domain.enums import ObservingProfile
+from bot.handlers.menu_format import MENU_PARSE_MODE, format_menu_message
 from bot.keyboards.forecast import forecast_locations_keyboard
 from bot.keyboards.menu import main_menu_keyboard
 from bot.providers.open_meteo import OpenMeteoClient
@@ -92,8 +93,9 @@ async def _send_forecast_locations(
         return
 
     await message.answer(
-        text("choose_location", language),
+        format_menu_message("🔭", text("choose_location", language)),
         reply_markup=forecast_locations_keyboard(saved_locations),
+        parse_mode=MENU_PARSE_MODE,
     )
 
 

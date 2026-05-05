@@ -24,9 +24,14 @@ def language_for_message(message: Message, users: UserRepository | None) -> str:
     return language_for_user(message_user_id(message), users)
 
 
-async def edit_callback_message(message: Message, text_value: str, reply_markup=None) -> None:  # noqa: ANN001
+async def edit_callback_message(  # noqa: ANN001
+    message: Message,
+    text_value: str,
+    reply_markup=None,
+    parse_mode: str | None = None,
+) -> None:
     try:
-        await message.edit_text(text_value, reply_markup=reply_markup)
+        await message.edit_text(text_value, reply_markup=reply_markup, parse_mode=parse_mode)
     except TelegramBadRequest as error:
         if "message is not modified" not in str(error):
             raise

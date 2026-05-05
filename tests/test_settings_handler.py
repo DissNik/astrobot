@@ -49,13 +49,18 @@ class FakeMessage:
         self.edits: list[tuple[str, object | None]] = []
         self.sent_messages: list[FakeSentMessage] = []
 
-    async def answer(self, text: str, reply_markup=None) -> FakeSentMessage:  # noqa: ANN001
+    async def answer(
+        self,
+        text: str,
+        reply_markup=None,
+        parse_mode: str | None = None,
+    ) -> FakeSentMessage:  # noqa: ANN001
         self.answers.append((text, reply_markup))
         sent_message = FakeSentMessage()
         self.sent_messages.append(sent_message)
         return sent_message
 
-    async def edit_text(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
+    async def edit_text(self, text: str, reply_markup=None, parse_mode: str | None = None) -> None:  # noqa: ANN001
         if self.edit_error is not None:
             raise self.edit_error
         self.edits.append((text, reply_markup))
@@ -100,7 +105,8 @@ async def test_settings_command_shows_edit_buttons(tmp_path: Path) -> None:
 
     text, keyboard = message.answers[0]
     labels = [button.text for row in keyboard.inline_keyboard for button in row]
-    assert "⚙️ Profile and subscription settings" in text
+    assert "<b>⚙️ Profile and subscription settings</b>" in text
+    assert "━━━━━━━━━━━━" in text
     assert "✅ 3 nights" in labels
     assert "5 nights" in labels
     assert "✅ Deep-sky" in labels
@@ -123,7 +129,7 @@ async def test_update_language_saves_selected_language(tmp_path: Path) -> None:
     )  # type: ignore[arg-type]
 
     assert users.get(100).language == "ru"
-    assert "⚙️ Настройки профиля и рассылки" in callback.message.edits[0][0]
+    assert "<b>⚙️ Настройки профиля и рассылки</b>" in callback.message.edits[0][0]
 
 
 @pytest.mark.asyncio
@@ -181,7 +187,8 @@ async def test_update_forecast_days_edits_settings_message_with_visual_summary(
     assert callback.message.answers == []
     labels = [button.text for row in keyboard.inline_keyboard for button in row]
     assert text == (
-        "⚙️ Profile and subscription settings\n\n"
+        "<b>⚙️ Profile and subscription settings</b>\n"
+        "━━━━━━━━━━━━\n"
         "🌙 Forecast: 5 nights\n"
         "🔭 Profile: Deep-sky\n"
         "🔔 Subscription: disabled\n"
@@ -228,7 +235,7 @@ async def test_update_language_edits_settings_without_status_prefix(tmp_path: Pa
         connection=users.connection,
     )  # type: ignore[arg-type]
 
-    assert callback.message.edits[0][0].startswith("⚙️ Настройки профиля и рассылки")
+    assert callback.message.edits[0][0].startswith("<b>⚙️ Настройки профиля и рассылки</b>")
     assert "Язык обновлен" not in callback.message.edits[0][0]
 
 

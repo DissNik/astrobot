@@ -14,6 +14,7 @@ from bot.handlers.common import (
     language_for_user,
     message_user_id,
 )
+from bot.handlers.menu_format import MENU_PARSE_MODE, format_menu_message
 from bot.keyboards.locations import (
     location_manage_keyboard,
     locations_list_keyboard,
@@ -49,6 +50,7 @@ async def locations_command(
     await message.answer(
         _format_locations(saved_locations, language),
         reply_markup=locations_list_keyboard(saved_locations, language),
+        parse_mode=MENU_PARSE_MODE,
     )
 
 
@@ -65,6 +67,7 @@ async def locations_callback(
             callback.message,
             _format_locations(saved_locations, language),
             reply_markup=locations_list_keyboard(saved_locations, language),
+            parse_mode=MENU_PARSE_MODE,
         )
     await callback.answer()
 
@@ -166,6 +169,7 @@ async def locations_list_callback(
             callback.message,
             _format_locations(saved_locations, language),
             reply_markup=locations_list_keyboard(saved_locations, language),
+            parse_mode=MENU_PARSE_MODE,
         )
     await callback.answer()
 
@@ -188,6 +192,7 @@ async def location_manage_callback(
             callback.message,
             _format_location_details(location, language),
             reply_markup=location_manage_keyboard(location, language),
+            parse_mode=MENU_PARSE_MODE,
         )
     await callback.answer()
 
@@ -260,6 +265,7 @@ async def delete_location_callback(
             callback.message,
             _format_locations(saved_locations, language),
             reply_markup=locations_list_keyboard(saved_locations, language),
+            parse_mode=MENU_PARSE_MODE,
         )
     await callback.answer()
 
@@ -288,6 +294,7 @@ async def toggle_location_subscription_callback(
                 callback.message,
                 _format_location_details(updated_location, language),
                 reply_markup=location_manage_keyboard(updated_location, language),
+                parse_mode=MENU_PARSE_MODE,
             )
     await callback.answer()
 
@@ -321,9 +328,9 @@ def _default_location_name(latitude: float, longitude: float) -> str:
 
 def _format_locations(locations: list, language: str = DEFAULT_LANGUAGE) -> str:
     if not locations:
-        return text("no_saved_locations", language)
+        return format_menu_message("📍", text("no_saved_locations", language))
 
-    return text("your_locations", language)
+    return format_menu_message("📍", text("your_locations", language))
 
 
 async def _resolve_location_input(
@@ -396,12 +403,12 @@ def _find_location_for_callback(
 
 def _format_location_details(location, language: str = DEFAULT_LANGUAGE) -> str:  # noqa: ANN001
     subscription = text("enabled" if location.enabled_for_subscription else "disabled", language)
-    return (
-        f"{location.name}\n"
+    body = (
         f"{text('coordinates', language)}: {location.latitude:.4f}, {location.longitude:.4f}\n"
         f"{text('source', language)}: {_format_source(location.source, language)}\n"
         f"{text('alerts', language)}: {subscription}"
     )
+    return format_menu_message("📍", location.name, body)
 
 
 def _format_source(source: LocationSource, language: str = DEFAULT_LANGUAGE) -> str:

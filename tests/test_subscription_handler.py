@@ -28,12 +28,15 @@ class FakeMessage:
         self.from_user = FakeUser(user_id)
         self.answers: list[str] = []
         self.edits: list[tuple[str, object | None]] = []
+        self.parse_modes: list[str | None] = []
 
-    async def answer(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
+    async def answer(self, text: str, reply_markup=None, parse_mode: str | None = None) -> None:  # noqa: ANN001
         self.answers.append(text)
+        self.parse_modes.append(parse_mode)
 
-    async def edit_text(self, text: str, reply_markup=None) -> None:  # noqa: ANN001
+    async def edit_text(self, text: str, reply_markup=None, parse_mode: str | None = None) -> None:  # noqa: ANN001
         self.edits.append((text, reply_markup))
+        self.parse_modes.append(parse_mode)
 
 
 class FakeCallback:
@@ -72,12 +75,14 @@ async def test_enable_subscription_callback_creates_enabled_subscription(tmp_pat
     assert subscription.score_threshold == 60
     assert message.answers == []
     assert message.edits[0][0] == (
-        "📬 Alerts\n\n"
+        "<b>📬 Alerts</b>\n"
+        "━━━━━━━━━━━━\n"
         "🔔 Subscription: enabled\n"
         "🕘 Time: 20:00 UTC\n"
         "📬 Mode: Daily digest\n"
         "⭐ Threshold: 60/100"
     )
+    assert message.parse_modes[0] == "HTML"
     keyboard = message.edits[0][1]
     labels_by_callback = {
         button.callback_data: button.text
@@ -133,7 +138,8 @@ async def test_enable_subscription_callback_reports_configured_time_and_timezone
     assert subscriptions.get(100).send_time_local == time(9, 3)
     assert message.answers == []
     assert message.edits[0][0] == (
-        "📬 Рассылка\n\n"
+        "<b>📬 Рассылка</b>\n"
+        "━━━━━━━━━━━━\n"
         "🔔 Рассылка: включена\n"
         "🕘 Время: 09:03 UTC\n"
         "📬 Режим: Ежедневный дайджест\n"
@@ -211,7 +217,8 @@ async def test_subscription_callback_edits_current_message(tmp_path: Path) -> No
 
     assert message.answers == []
     assert message.edits[0][0] == (
-        "📬 Alerts\n\n"
+        "<b>📬 Alerts</b>\n"
+        "━━━━━━━━━━━━\n"
         "🔔 Subscription: disabled\n"
         "🕘 Time: 20:00 UTC\n"
         "📬 Mode: Daily digest\n"
@@ -243,7 +250,8 @@ async def test_disable_subscription_callback_disables_existing_subscription(tmp_
     assert subscription.enabled is False
     assert callback.message.answers == []
     assert callback.message.edits[-1][0] == (
-        "📬 Alerts\n\n"
+        "<b>📬 Alerts</b>\n"
+        "━━━━━━━━━━━━\n"
         "🔔 Subscription: disabled\n"
         "🕘 Time: 20:00 UTC\n"
         "📬 Mode: Daily digest\n"
