@@ -1,9 +1,9 @@
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
-from bot.handlers.menu_format import MENU_PARSE_MODE, format_menu_message
 from bot.keyboards.menu import main_menu_keyboard
 from bot.texts.i18n import DEFAULT_LANGUAGE, text
+from bot.texts.message_format import MENU_PARSE_MODE, format_menu_message
 
 router = Router()
 

@@ -7,7 +7,6 @@ from aiogram.types import CallbackQuery, Message
 from bot.domain.enums import SubscriptionMode
 from bot.domain.models import Subscription, User
 from bot.handlers.common import edit_callback_message, language_for_message, language_for_user
-from bot.handlers.menu_format import MENU_PARSE_MODE, format_menu_message
 from bot.keyboards.subscription import subscription_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
 from bot.repositories.users import UserRepository
@@ -18,6 +17,7 @@ from bot.services.subscription_service import (
 )
 from bot.services.user_service import build_default_user, ensure_user
 from bot.texts.i18n import normalize_language, text
+from bot.texts.message_format import MENU_PARSE_MODE, format_menu_message
 
 router = Router()
 

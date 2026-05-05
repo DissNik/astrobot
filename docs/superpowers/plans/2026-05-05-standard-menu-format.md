@@ -32,7 +32,7 @@
 ### Task 2: Implement Shared Formatting
 
 - [x] Create `bot/handlers/menu_format.py` with `MENU_PARSE_MODE = "HTML"`,
-  `MENU_DIVIDER = "━━━━━━━━━━━━"`, and `format_menu_message`.
+  `MENU_DIVIDER = "____________"`, and `format_menu_message`.
 - [x] Escape title and body with `html.escape`.
 - [x] Omit the divider when body is empty or whitespace-only.
 - [x] Run `.venv/bin/pytest tests/test_menu_format.py -q`.

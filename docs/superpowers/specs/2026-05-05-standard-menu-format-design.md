@@ -25,7 +25,8 @@ Menu text must be rendered as HTML:
 
 ```text
 <b>{icon} {title}</b>
-━━━━━━━━━━━━
+____________
+
 {body}
 ```
 

@@ -106,7 +106,7 @@ async def test_settings_command_shows_edit_buttons(tmp_path: Path) -> None:
     text, keyboard = message.answers[0]
     labels = [button.text for row in keyboard.inline_keyboard for button in row]
     assert "<b>⚙️ Profile and subscription settings</b>" in text
-    assert "━━━━━━━━━━━━" in text
+    assert "____________\n\n" in text
     assert "✅ 3 nights" in labels
     assert "5 nights" in labels
     assert "✅ Deep-sky" in labels
@@ -188,7 +188,7 @@ async def test_update_forecast_days_edits_settings_message_with_visual_summary(
     labels = [button.text for row in keyboard.inline_keyboard for button in row]
     assert text == (
         "<b>⚙️ Profile and subscription settings</b>\n"
-        "━━━━━━━━━━━━\n"
+        "____________\n\n"
         "🌙 Forecast: 5 nights\n"
         "🔭 Profile: Deep-sky\n"
         "🔔 Subscription: disabled\n"

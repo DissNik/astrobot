@@ -2,17 +2,18 @@ from html import escape
 
 from bot.domain.models import LocationForecast
 from bot.texts.i18n import text, translate_reason, translate_verdict
+from bot.texts.message_format import format_menu_message
 
 FORECAST_PARSE_MODE = "HTML"
 
 
 def format_forecast_report(reports: list[LocationForecast], language: str = "en") -> str:
     title = text("forecast_title", language)
-    lines = [f"🔭 <b>{escape(title)}</b>"]
+    lines: list[str] = []
     reports_with_nights = [report for report in reports if report.nights]
 
     if not reports_with_nights:
-        return f"🔭 <b>{escape(title)}</b>\n{text('no_forecasts', language)}"
+        return format_menu_message("🔭", title, text("no_forecasts", language))
 
     for report in reports_with_nights:
         lines.append("")
@@ -50,7 +51,7 @@ def format_forecast_report(reports: list[LocationForecast], language: str = "en"
                 ]
             )
 
-    return "\n".join(lines)
+    return format_menu_message("🔭", title, "\n".join(lines), escape_body=False)
 
 
 def _verdict_icon(verdict: str) -> str:

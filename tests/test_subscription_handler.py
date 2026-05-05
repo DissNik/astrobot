@@ -76,7 +76,7 @@ async def test_enable_subscription_callback_creates_enabled_subscription(tmp_pat
     assert message.answers == []
     assert message.edits[0][0] == (
         "<b>📬 Alerts</b>\n"
-        "━━━━━━━━━━━━\n"
+        "____________\n\n"
         "🔔 Subscription: enabled\n"
         "🕘 Time: 20:00 UTC\n"
         "📬 Mode: Daily digest\n"
@@ -139,7 +139,7 @@ async def test_enable_subscription_callback_reports_configured_time_and_timezone
     assert message.answers == []
     assert message.edits[0][0] == (
         "<b>📬 Рассылка</b>\n"
-        "━━━━━━━━━━━━\n"
+        "____________\n\n"
         "🔔 Рассылка: включена\n"
         "🕘 Время: 09:03 UTC\n"
         "📬 Режим: Ежедневный дайджест\n"
@@ -218,7 +218,7 @@ async def test_subscription_callback_edits_current_message(tmp_path: Path) -> No
     assert message.answers == []
     assert message.edits[0][0] == (
         "<b>📬 Alerts</b>\n"
-        "━━━━━━━━━━━━\n"
+        "____________\n\n"
         "🔔 Subscription: disabled\n"
         "🕘 Time: 20:00 UTC\n"
         "📬 Mode: Daily digest\n"
@@ -251,7 +251,7 @@ async def test_disable_subscription_callback_disables_existing_subscription(tmp_
     assert callback.message.answers == []
     assert callback.message.edits[-1][0] == (
         "<b>📬 Alerts</b>\n"
-        "━━━━━━━━━━━━\n"
+        "____________\n\n"
         "🔔 Subscription: disabled\n"
         "🕘 Time: 20:00 UTC\n"
         "📬 Mode: Daily digest\n"

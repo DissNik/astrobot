@@ -366,7 +366,7 @@ async def test_location_manage_callback_edits_current_message(tmp_path: Path) ->
     assert message.answers == []
     assert message.edits[0][0] == (
         "<b>📍 Поле</b>\n"
-        "━━━━━━━━━━━━\n"
+        "____________\n\n"
         "Coordinates: 45.0448, 38.9760\n"
         "Source: coordinates\n"
         "Alerts: enabled"

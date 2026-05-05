@@ -10,7 +10,6 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from bot.domain.enums import ObservingProfile, SubscriptionMode
 from bot.domain.models import Subscription, User
 from bot.handlers.common import edit_callback_message, language_for_user, message_user_id
-from bot.handlers.menu_format import MENU_PARSE_MODE, format_menu_message
 from bot.keyboards.menu import main_menu_keyboard
 from bot.keyboards.settings import settings_keyboard
 from bot.repositories.subscriptions import SubscriptionRepository
@@ -19,6 +18,7 @@ from bot.services.subscription_service import build_default_subscription
 from bot.services.timezones import normalize_timezone
 from bot.services.user_service import build_default_user
 from bot.texts.i18n import DEFAULT_LANGUAGE, normalize_language, text
+from bot.texts.message_format import MENU_PARSE_MODE, format_menu_message
 
 router = Router()
 

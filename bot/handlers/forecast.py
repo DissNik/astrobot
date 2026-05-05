@@ -3,7 +3,6 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from bot.domain.enums import ObservingProfile
-from bot.handlers.menu_format import MENU_PARSE_MODE, format_menu_message
 from bot.keyboards.forecast import forecast_locations_keyboard
 from bot.keyboards.menu import main_menu_keyboard
 from bot.providers.open_meteo import OpenMeteoClient
@@ -12,6 +11,7 @@ from bot.repositories.users import UserRepository
 from bot.services.forecast_service import build_location_forecast, provider_days_for_nights
 from bot.services.report_formatter import FORECAST_PARSE_MODE, format_forecast_report
 from bot.texts.i18n import DEFAULT_LANGUAGE, normalize_language, text
+from bot.texts.message_format import MENU_PARSE_MODE, format_menu_message
 
 router = Router()
 

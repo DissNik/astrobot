@@ -39,7 +39,7 @@ def test_format_forecast_report_defaults_to_english() -> None:
 
     text = format_forecast_report([report])
 
-    assert text.startswith("🔭 <b>Astronomical forecast</b>")
+    assert text.startswith("<b>🔭 Astronomical forecast</b>\n____________\n\n")
     assert "📍 <b>Location:</b> Dark field" in text
     assert "✅ <b>2026-04-26</b> — <b>78/100</b>, good to go" in text
     assert "━━━━━━━━━━━━" not in text
@@ -87,7 +87,7 @@ def test_format_forecast_report_supports_russian() -> None:
 
     text = format_forecast_report([report], language="ru")
 
-    assert text.startswith("🔭 <b>Астрономический прогноз</b>")
+    assert text.startswith("<b>🔭 Астрономический прогноз</b>\n____________\n\n")
     assert "📍 <b>Локация:</b> Dark field" in text
     assert "✅ <b>2026-04-26</b> — <b>78/100</b>, можно ехать" in text
     assert "☁ <b>Облака:</b> 15%, высокие 8%" in text
@@ -147,8 +147,7 @@ def test_format_forecast_report_uses_status_icon_for_bad_and_doubtful_nights() -
 def test_format_forecast_report_handles_empty_reports() -> None:
     text = format_forecast_report([])
 
-    assert "Astronomical forecast" in text
-    assert "No forecasts available." in text
+    assert text == "<b>🔭 Astronomical forecast</b>\n____________\n\nNo forecasts available."
 
 
 def test_format_forecast_report_skips_locations_without_nights() -> None:
