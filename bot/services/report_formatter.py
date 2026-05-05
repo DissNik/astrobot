@@ -1,10 +1,11 @@
 from html import escape
 
-from bot.domain.models import LocationForecast
+from bot.domain.models import LocationForecast, NightForecast
 from bot.texts.i18n import text, translate_reason, translate_verdict
 from bot.texts.message_format import format_menu_message
 
 FORECAST_PARSE_MODE = "HTML"
+MOON_NOT_VISIBLE_FACTOR = "Луна не видна"
 
 
 def format_forecast_report(reports: list[LocationForecast], language: str = "en") -> str:
@@ -34,8 +35,8 @@ def format_forecast_report(reports: list[LocationForecast], language: str = "en"
                     f"◦ <b>{text('humidity', language)}:</b> {night.humidity}%",
                     f"→ <b>{text('wind', language)}:</b> {night.wind_speed:.1f} m/s",
                     (
-                        f"× <b>{text('blocking', language)}:</b> "
-                        f"{_format_reasons(night.reasons, language)}"
+                        f"{_factors_icon(night.verdict)} <b>{text('factors', language)}:</b> "
+                        f"{_format_display_factors(night, language)}"
                     ),
                 ]
             )
@@ -62,7 +63,19 @@ def _verdict_icon(verdict: str) -> str:
     return "✅"
 
 
-def _format_reasons(reasons: tuple[str, ...], language: str) -> str:
-    if not reasons:
+def _factors_icon(verdict: str) -> str:
+    if verdict == "не стоит":
+        return "×"
+    if verdict == "сомнительно":
+        return "!"
+    return "✓"
+
+
+def _format_display_factors(night: NightForecast, language: str) -> str:
+    factors = list(night.reasons)
+    if not night.moon_visible:
+        factors.append(MOON_NOT_VISIBLE_FACTOR)
+
+    if not factors:
         return text("no_reasons", language)
-    return escape(", ".join(translate_reason(reason, language) for reason in reasons))
+    return escape(", ".join(translate_reason(factor, language) for factor in factors))
