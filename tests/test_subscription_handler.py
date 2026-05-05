@@ -85,8 +85,8 @@ async def test_enable_subscription_callback_creates_enabled_subscription(tmp_pat
         for button in row
     }
 
-    assert labels_by_callback["subscription:enable"] == "✅ Enable alerts"
-    assert labels_by_callback["subscription:disable"] == "Disable alerts"
+    assert labels_by_callback["subscription:enable"] == "✅ enabled"
+    assert labels_by_callback["subscription:disable"] == "disabled"
     assert labels_by_callback["settings:open"] == "⚙️ Settings"
 
 

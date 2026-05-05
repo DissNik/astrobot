@@ -9,11 +9,11 @@ def subscription_keyboard(language: str = "en", enabled: bool = False) -> Inline
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=_mark_selected(text("enable_alerts", language), enabled),
+                    text=_mark_selected(text("enabled", language), enabled),
                     callback_data="subscription:enable",
                 ),
                 InlineKeyboardButton(
-                    text=_mark_selected(text("disable_alerts", language), not enabled),
+                    text=_mark_selected(text("disabled", language), not enabled),
                     callback_data="subscription:disable",
                 ),
             ],
