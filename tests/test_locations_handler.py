@@ -369,7 +369,7 @@ async def test_location_manage_callback_edits_current_message(tmp_path: Path) ->
         "____________\n\n"
         "Coordinates: 45.0448, 38.9760\n"
         "Source: coordinates\n"
-        "Alerts: enabled"
+        "Alerts: Enabled"
     )
 
 
@@ -404,7 +404,7 @@ async def test_toggle_location_subscription_edits_location_card(tmp_path: Path) 
 
     assert locations.list_for_user(100)[0].enabled_for_subscription is False
     assert message.answers == []
-    assert "Alerts: disabled" in message.edits[0][0]
+    assert "Alerts: Disabled" in message.edits[0][0]
 
 
 @pytest.mark.asyncio

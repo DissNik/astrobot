@@ -77,7 +77,7 @@ async def test_enable_subscription_callback_creates_enabled_subscription(tmp_pat
     assert message.edits[0][0] == (
         "<b>📬 Alerts</b>\n"
         "____________\n\n"
-        "🔔 Subscription: enabled\n"
+        "🔔 Subscription: Enabled\n"
         "🕘 Time: 20:00 UTC\n"
         "📬 Mode: Daily digest\n"
         "⭐ Threshold: 60/100"
@@ -90,8 +90,8 @@ async def test_enable_subscription_callback_creates_enabled_subscription(tmp_pat
         for button in row
     }
 
-    assert labels_by_callback["subscription:enable"] == "✅ enabled"
-    assert labels_by_callback["subscription:disable"] == "disabled"
+    assert labels_by_callback["subscription:enable"] == "✅ Enabled"
+    assert labels_by_callback["subscription:disable"] == "Disabled"
     assert labels_by_callback["settings:open"] == "⚙️ Settings"
 
 
@@ -140,7 +140,7 @@ async def test_enable_subscription_callback_reports_configured_time_and_timezone
     assert message.edits[0][0] == (
         "<b>📬 Рассылка</b>\n"
         "____________\n\n"
-        "🔔 Рассылка: включена\n"
+        "🔔 Рассылка: Включена\n"
         "🕘 Время: 09:03 UTC\n"
         "📬 Режим: Ежедневный дайджест\n"
         "⭐ Порог: 60/100"
@@ -219,7 +219,7 @@ async def test_subscription_callback_edits_current_message(tmp_path: Path) -> No
     assert message.edits[0][0] == (
         "<b>📬 Alerts</b>\n"
         "____________\n\n"
-        "🔔 Subscription: disabled\n"
+        "🔔 Subscription: Disabled\n"
         "🕘 Time: 20:00 UTC\n"
         "📬 Mode: Daily digest\n"
         "⭐ Threshold: 60/100"
@@ -252,7 +252,7 @@ async def test_disable_subscription_callback_disables_existing_subscription(tmp_
     assert callback.message.edits[-1][0] == (
         "<b>📬 Alerts</b>\n"
         "____________\n\n"
-        "🔔 Subscription: disabled\n"
+        "🔔 Subscription: Disabled\n"
         "🕘 Time: 20:00 UTC\n"
         "📬 Mode: Daily digest\n"
         "⭐ Threshold: 60/100"

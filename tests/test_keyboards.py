@@ -50,8 +50,8 @@ def test_subscription_keyboard_marks_current_state_and_links_settings() -> None:
     ]
 
     assert rows[0] == [
-        ("subscription:enable", "включена"),
-        ("subscription:disable", "✅ отключена"),
+        ("subscription:enable", "Включена"),
+        ("subscription:disable", "✅ Отключена"),
     ]
     assert rows[1] == [("settings:open", "⚙️ Настройки")]
 
@@ -62,8 +62,8 @@ def test_subscription_keyboard_marks_current_state_and_links_settings() -> None:
         for button in row
     }
 
-    assert enabled_labels["subscription:enable"] == "✅ включена"
-    assert enabled_labels["subscription:disable"] == "отключена"
+    assert enabled_labels["subscription:enable"] == "✅ Включена"
+    assert enabled_labels["subscription:disable"] == "Отключена"
 
 
 def test_settings_keyboard_uses_wide_rows_for_long_russian_labels() -> None:

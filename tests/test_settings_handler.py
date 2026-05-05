@@ -191,7 +191,7 @@ async def test_update_forecast_days_edits_settings_message_with_visual_summary(
         "____________\n\n"
         "🌙 Forecast: 5 nights\n"
         "🔭 Profile: Deep-sky\n"
-        "🔔 Subscription: disabled\n"
+        "🔔 Subscription: Disabled\n"
         "🕘 Time: 20:00 UTC\n"
         "📬 Mode: Daily digest\n"
         "⭐ Threshold: 60/100"
