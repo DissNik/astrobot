@@ -107,9 +107,11 @@ def score_conditions(data: ScoreInput) -> ScoreResult:
         reasons.append("много высокой облачности")
 
     if data.profile is ObservingProfile.DEEP_SKY:
-        moon_penalty = round(data.moon_phase * DEEP_SKY_MOON_PHASE_WEIGHT)
+        moon_penalty = 0
         if data.moon_visible:
-            moon_penalty += VISIBLE_MOON_PENALTY
+            moon_penalty = (
+                round(data.moon_phase * DEEP_SKY_MOON_PHASE_WEIGHT) + VISIBLE_MOON_PENALTY
+            )
         score -= moon_penalty
         if moon_penalty >= MOON_REASON_THRESHOLD:
             reasons.append("Луна мешает deep-sky")

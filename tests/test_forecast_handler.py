@@ -204,4 +204,4 @@ async def test_forecast_location_callback_uses_selected_russian_language(
     )  # type: ignore[arg-type]
 
     assert "Астрономический прогноз" in message.answers[0][0]
-    assert "можно ехать" in message.answers[0][0]
+    assert "отлично" in message.answers[0][0]

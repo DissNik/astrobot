@@ -44,7 +44,7 @@ def test_cloudy_night_scores_low() -> None:
         )
     )
 
-    assert result.score <= 35
+    assert result.score < 40
     assert result.verdict == "не стоит"
     assert any("облачность" in reason for reason in result.reasons)
 
@@ -66,6 +66,15 @@ def test_full_moon_penalizes_deep_sky_more_than_planetary() -> None:
     planetary = score_conditions(ScoreInput(profile=ObservingProfile.PLANETARY_LUNAR, **common))
 
     assert planetary.score > deep_sky.score
+
+
+def test_invisible_moon_does_not_penalize_deep_sky() -> None:
+    without_moon = score_conditions(_valid_score_input(moon_phase=0.98, moon_visible=False))
+    with_moon = score_conditions(_valid_score_input(moon_phase=0.98, moon_visible=True))
+
+    assert with_moon.score < without_moon.score
+    assert "Луна мешает deep-sky" not in without_moon.reasons
+    assert "Луна мешает deep-sky" in with_moon.reasons
 
 
 def test_city_sky_penalizes_deep_sky() -> None:
